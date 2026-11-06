@@ -32,7 +32,7 @@ export function renderMenu(root: HTMLElement) {
         <h1>Gemelos digitales de nueva generación</h1>
         <p class="menu-lead">Tres plantas tipo de pyme simuladas en tiempo real. Provoca crisis, compara escenarios y observa las consecuencias antes de decidir.</p>
       </div>
-      <span class="pill" id="menu-datos"><i class="dot sim"></i> Datos simulados</span>
+      <div class="fila"><span class="pill" id="menu-datos"><i class="dot sim"></i> Datos simulados</span><a class="btn hidden" id="menu-salir" href="/salir">Cerrar sesión</a></div>
     </div>
     <div class="menu-cards"></div>
     <div class="menu-foot">
@@ -55,6 +55,12 @@ export function renderMenu(root: HTMLElement) {
     cards.appendChild(a);
   }
   root.appendChild(page);
+  fetch('/api/sesion', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((s) => {
+      if (s?.autenticacion) page.querySelector('#menu-salir')?.classList.remove('hidden');
+    })
+    .catch(() => {});
   fetch('/api/datos')
     .then((r) => r.json())
     .then((d) => {

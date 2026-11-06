@@ -6,3 +6,8 @@ dist/
 twins/registry.gen.ts
 # Configuración local de herramientas
 .claude/
+
+# Secretos locales
+.env
+.env.*
+!.env.example

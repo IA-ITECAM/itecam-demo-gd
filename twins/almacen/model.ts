@@ -12,6 +12,8 @@ import { config, FILAS_Z, BLOQUES_X, TRANSVERSALES_X, MUELLES_RECEPCION, MUELLES
 
 type P2 = [number, number];
 const SLA_S = 45 * 60;
+/** Tope de tareas pendientes: acota memoria y CPU si la simulación se deja correr días con poca flota. */
+const MAX_PENDIENTES = 3000;
 const MANIPULACION_S = 40;
 
 export interface AlmParams extends CommonParams {
@@ -296,7 +298,7 @@ function step(s: AlmState, dt: number) {
   for (let i = 0; i < n; i++) {
     const bloqueado = chance(r, sinStockFrac);
     const reserva = bloqueado && planActivo(s, 'proveedor');
-    s.pendientes.push({
+    const pedido: Tarea = {
       id: s.nextId++,
       tipo: 'pedido',
       desde: reserva ? RESERVA : ubicacion(s),
@@ -305,14 +307,17 @@ function step(s: AlmState, dt: number) {
       due: s.workT + SLA_S,
       bloqueado: bloqueado && !reserva,
       reserva,
-    });
+    };
+    // Por encima del tope el pedido se pierde (cuenta como demanda no servida)
+    if (s.pendientes.length < MAX_PENDIENTES) s.pendientes.push(pedido);
     L.servDen++;
   }
   // --- Camiones de entrada (ubicaciones)
   if (!crisisActiva(s, 'proveedor') && enVentana(s.t, 6, 20)) {
     const m = poisson(r, p.entradasHora, dt);
     for (let i = 0; i < m; i++) {
-      s.pendientes.push({ id: s.nextId++, tipo: 'ubicacion', desde: MUELLES_RECEPCION[int(r, 0, MUELLES_RECEPCION.length - 1)], hacia: ubicacion(s), creado: s.workT, due: Infinity, bloqueado: false, reserva: false });
+      const t: Tarea = { id: s.nextId++, tipo: 'ubicacion', desde: MUELLES_RECEPCION[int(r, 0, MUELLES_RECEPCION.length - 1)], hacia: ubicacion(s), creado: s.workT, due: Infinity, bloqueado: false, reserva: false };
+      if (s.pendientes.length < MAX_PENDIENTES) s.pendientes.push(t);
     }
   }
   // Fin de la rotura de stock: se desbloquean; con plan, los bloqueados pasan a la reserva
@@ -614,6 +619,7 @@ export function barrido(live: AlmParams, seed: number) {
     pedidos.push(k.unidades);
   }
   const res = { flotas, servicio, coste, pedidos };
+  if (cacheBarrido.size >= 8) cacheBarrido.clear();
   cacheBarrido.set(key, res);
   return res;
 }

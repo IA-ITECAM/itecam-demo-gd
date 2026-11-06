@@ -172,7 +172,8 @@ export class TwinRunner<P extends { ctx: ContextoEnergia } = any> {
    * las simula hacia delante con la misma semilla y devuelve la curva de resiliencia.
    */
   resiliencia(id: CrisisId): ResilienceResult {
-    const def = this.config.crisis.find((d) => d.id === id)!;
+    const def = this.config.crisis.find((d) => d.id === id);
+    if (!def) throw new Error(`Crisis desconocida: ${id}`);
     const H = this.model.horizonteResilienciaH * 3600;
     const bin = 900;
     const dt = this.model.dt;
@@ -250,6 +251,7 @@ export class TwinRunner<P extends { ctx: ContextoEnergia } = any> {
       return { ...sc, kpis: kpisFrom(s.L, s.t) };
     });
     const res: CompareResult = { titulo: cmp.titulo, pregunta: cmp.pregunta, horizonte: cmp.horizonte, escenarios };
+    if (this.compareCache.size >= 32) this.compareCache.clear(); // memoria acotada
     this.compareCache.set(key, res);
     return res;
   }
@@ -258,7 +260,7 @@ export class TwinRunner<P extends { ctx: ContextoEnergia } = any> {
   command(cmd: string, args: any = {}): { type: string; [k: string]: unknown } | null {
     switch (cmd) {
       case 'velocidad':
-        if (VELOCIDADES[args.v]) this.speed = args.v;
+        if (Object.hasOwn(VELOCIDADES, String(args?.v))) this.speed = Number(args.v);
         if (this.paused) this.paused = false;
         return null;
       case 'pausa':
@@ -268,7 +270,7 @@ export class TwinRunner<P extends { ctx: ContextoEnergia } = any> {
         this.reset();
         return null;
       case 'escenario':
-        if (['base', 'A', 'B'].includes(args.id)) {
+        if (['base', 'A', 'B'].includes(args?.id)) {
           this.escenario = args.id;
           this.reset();
         }

@@ -19,13 +19,17 @@ docker compose up --build
 
 Abre **http://localhost:8080**. Para pararlo, pulsa `Ctrl+C` o ejecuta `docker compose down`.
 
-Variables opcionales (en `docker-compose.yml`):
+La configuración se lee de un fichero **`.env`** junto a `docker-compose.yml` (copia `.env.example`). Sin `.env` la demo arranca igual, con acceso libre.
 
 | Variable | Por defecto | Qué hace |
 |---|---|---|
+| `CLAVE_ACCESO` | *(vacía)* | **Contraseña de acceso.** Si está definida, todo (páginas, API y tiempo real) exige iniciar sesión. Vacía = acceso libre (solo para un portátil). |
+| `SECRETO_SESION` | *(aleatorio)* | Clave para firmar las sesiones. Si se deja vacía se genera al arrancar y las sesiones caducan al reiniciar el contenedor. |
+| `SESION_HORAS` | `12` | Duración de la sesión. |
 | `DATOS_PUBLICOS` | `0` | Con `1`, al arrancar intenta descargar el precio eléctrico (REData) y la temperatura (Open-Meteo). Si falla, usa los datos simulados. |
 | `SEMILLA` | `2026` | Semilla de la simulación. Con la misma semilla, la demo es idéntica. |
-| `PORT` | `8080` | Puerto interno. |
+| `PUERTO_LOCAL` | `8080` | Puerto del equipo en el que se publica la demo, **solo en 127.0.0.1**. |
+| `MAX_CONEXIONES` / `MAX_CONEXIONES_IP` | `60` / `15` | Conexiones de tiempo real simultáneas en total y por IP. |
 
 ### Sin Docker (desarrollo)
 
@@ -232,9 +236,85 @@ itecam-demo-gd/
 
 ---
 
-## 8. VR (Meta Quest 3, opcional)
+## 8. Despliegue en Dokploy (VPS)
 
-El botón **VR** aparece solo si el navegador admite WebXR. Las gafas exigen un **contexto seguro** (HTTPS o `localhost`), así que `http://IP-del-portátil:8080` no basta. Opciones:
+### Opción recomendada: servicio «Docker Compose»
+
+1. Sube el proyecto a un repositorio Git **privado** (el `.env` no se sube: está en `.gitignore`).
+2. En Dokploy: *Project → Create Service → Compose*. Elige el repositorio y la rama; *Compose Path*: `./docker-compose.yml`.
+3. Pestaña **Environment**: pega las variables (Dokploy las guarda en un `.env` junto al compose):
+   ```
+   CLAVE_ACCESO=una-contraseña-larga-de-al-menos-12-caracteres
+   SECRETO_SESION=pega-aquí-un-valor-aleatorio
+   SESION_HORAS=12
+   ```
+   Genera el secreto con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` o con `openssl rand -hex 32`.
+4. Pestaña **Domains**: añade tu dominio (o subdominio) con *Service* `gemelos`, *Container Port* `8080` y **HTTPS activado** (Let's Encrypt). El DNS del dominio debe apuntar a la IP del VPS.
+5. **Deploy**. Al abrir el dominio debe aparecer la pantalla de contraseña.
+
+Comprobaciones rápidas tras desplegar (cambia el dominio):
+
+```bash
+curl -sI https://demo.tudominio.es/ | head -3
+```
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://demo.tudominio.es/api/datos
+```
+
+La primera debe devolver una redirección (`302`) a `/acceso` y la segunda `401`.
+
+**Por qué es seguro así:**
+
+- El compose **no publica el puerto 8080 hacia Internet**: solo lo abre en `127.0.0.1` del VPS, y el tráfico público entra únicamente por Traefik (el proxy de Dokploy) con HTTPS. Ojo: Docker se salta reglas de UFW cuando publica un puerto en `0.0.0.0`; por eso la publicación está limitada a `127.0.0.1`. Si en el VPS el 8080 ya está ocupado, cambia `PUERTO_LOCAL` en el Environment.
+- **No abras el puerto 8080 en el cortafuegos** ni en el panel del proveedor del VPS.
+
+### Alternativa: servicio «Application» con Dockerfile
+
+*Create Service → Application*, *Build Type*: **Dockerfile**, las mismas variables en **Environment** y, en **Domains**, el puerto `8080` con HTTPS. Las opciones de endurecimiento del compose (`read_only`, `cap_drop`, límites de memoria y CPU) no se aplican en este modo; configura los límites de recursos en la pestaña *Advanced* de Dokploy.
+
+### Recomendaciones para el VPS (fuera de esta app)
+
+- Cortafuegos con solo los puertos **22, 80 y 443** abiertos; el panel de Dokploy (3000), restringido a tu IP o tras su propio dominio con HTTPS.
+- SSH solo con clave (sin contraseña) y sin acceso directo de `root`.
+- Contraseña fuerte y 2FA en el panel de Dokploy; actualizaciones automáticas de seguridad del sistema.
+- Vuelve a desplegar de vez en cuando para recoger parches de la imagen base `node:24-alpine`.
+
+---
+
+## 9. Seguridad
+
+Se revisó la aplicación pensando en su publicación en Internet. Medidas aplicadas:
+
+| Riesgo | Medida |
+|---|---|
+| Acceso de cualquiera a la demo | Contraseña (`CLAVE_ACCESO`) en una pantalla propia. Se protegen todas las páginas, la API, los ficheros y el WebSocket. |
+| Robo o falsificación de la sesión | Cookie firmada con HMAC-SHA256, `HttpOnly`, `SameSite=Strict` y `Secure` bajo HTTPS. No contiene la contraseña, caduca y deja de valer si se cambia la contraseña. Las conexiones de tiempo real se cierran al caducar la sesión. |
+| Fuerza bruta | 5 fallos por IP en 15 min bloquean esa IP 15 min, con una espera de 0,6 s por fallo. La contraseña se compara en tiempo constante. Solo se confía en `X-Forwarded-For` si la petición llega desde la red privada del proxy. |
+| Caída del servidor con un mensaje malformado | Antes, un único frame WebSocket inválido tumbaba el proceso (comprobado). Ahora se manejan los errores de cada conexión y los mensajes están limitados a 4 KB. |
+| Comandos manipulados | Lista blanca de comandos con validación de cada argumento. Por ejemplo, antes una velocidad `"__proto__"` congelaba la simulación. Los errores internos no se envían al navegador. |
+| Saturación (DoS) | Máximo 10 mensajes/s por conexión (se corta a quien abusa), los cálculos pesados se espacian, los datos públicos se consultan como mucho cada 15 s, hay límite de conexiones total y por IP, se omiten los envíos a clientes lentos y las colas y cachés de la simulación están acotadas. |
+| WebSocket desde otra web (CSWSH) y CSRF | Se comprueba el `Origin` en el WebSocket y en el formulario de acceso. |
+| XSS y clickjacking | CSP estricta (`script-src 'self'`, sin scripts en línea), `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff` y `Referrer-Policy`; se escapan los textos que se pintan como HTML. |
+| Redirección abierta | Tras el acceso solo se vuelve a rutas internas (`/mecanizado`…). |
+| Lectura de ficheros del servidor | Solo se sirven los ficheros compilados; probados intentos de *path traversal* (devuelven 404). |
+| Escalada dentro del contenedor | Imagen final sin `node_modules`, usuario `node` (no root), sistema de ficheros de solo lectura, sin capacidades (`cap_drop: ALL`), `no-new-privileges` y límites de memoria, CPU y procesos. |
+| Cadena de suministro | `npm ci --ignore-scripts` en la construcción; `npm audit` sin vulnerabilidades conocidas a fecha de esta revisión. |
+| Secretos | El `.env` no se sube a Git ni se copia en la imagen (`.gitignore` y `.dockerignore`). |
+
+Riesgos que quedan (asumidos para una demo):
+
+- Es **una única contraseña compartida**: quien la tenga puede usar y controlar la demo. Cámbiala tras el webinar si la has repartido.
+- Sin HTTPS la contraseña viajaría en claro: publícala **siempre** con el dominio HTTPS de Dokploy.
+- El bloqueo por intentos fallidos vive en memoria y se reinicia si se reinicia el contenedor.
+- Los estilos permiten `'unsafe-inline'` (las etiquetas 3D y las gráficas lo necesitan); los scripts no.
+- Con `DATOS_PUBLICOS` el servidor sale a Internet, solo a `apidatos.ree.es` y `api.open-meteo.com` (URLs fijas, sin datos del usuario).
+
+---
+
+## 10. VR (Meta Quest 3, opcional)
+
+El botón **VR** aparece solo si el navegador admite WebXR. Las gafas exigen un **contexto seguro** (HTTPS o `localhost`). Desplegada en Dokploy con dominio HTTPS, basta con abrir el dominio en el navegador de las Quest. En local, `http://IP-del-portátil:8080` no basta. Opciones:
 
 - Conectar las gafas por USB y usar `adb reverse tcp:8080 tcp:8080`; después, abrir `http://localhost:8080` en el navegador de las Quest.
 - Publicar el puerto con un túnel HTTPS.
@@ -243,7 +323,7 @@ En VR apareces en el borde de la planta. Las etiquetas flotantes no se muestran 
 
 ---
 
-## 9. Limitaciones conocidas
+## 11. Limitaciones conocidas
 
 - Son **modelos de demostración**: los parámetros son genéricos y verosímiles, pero no proceden de ninguna empresa. No deben usarse para decisiones reales sin calibrarlos.
 - Los AGV no gestionan colisiones ni bloqueos entre sí (pueden cruzarse en un pasillo).

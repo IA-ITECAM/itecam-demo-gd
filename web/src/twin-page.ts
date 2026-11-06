@@ -237,6 +237,21 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   resModal.onAplicarPlan = () => socket.send('plan');
   cmpModal.onVer3D = (id: ScenarioId) => socket.send('escenario', { id });
 
+  // ---------- Avisos breves del servidor ----------
+  let avisoTimer: number | undefined;
+  function aviso(texto: string) {
+    let t = page.querySelector('.toast') as HTMLElement | null;
+    if (!t) {
+      t = el('div', 'toast');
+      t.setAttribute('role', 'status');
+      page.appendChild(t);
+    }
+    t.textContent = texto;
+    t.classList.remove('hidden');
+    clearTimeout(avisoTimer);
+    avisoTimer = window.setTimeout(() => t!.classList.add('hidden'), 3500);
+  }
+
   // ---------- Alertas ----------
   let alertKey = '';
   function renderAlertas(v: any) {
@@ -351,7 +366,9 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
         cmpModal.open(msg.data, lastFrame?.escenario ?? 'base');
         break;
       case 'error':
-        console.warn(msg.mensaje);
+      case 'aviso':
+        aviso(String(msg.mensaje ?? ''));
+        if (cmpModal.isOpen && cmpModal.root.querySelector('.cargando')) cmpModal.close();
         break;
     }
     for (const h of msgHandlers) h(msg);

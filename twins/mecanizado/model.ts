@@ -22,6 +22,8 @@ const ETAPA_PUESTO: PuestoId[] = ['almacen', 'corte', 'torno', 'montaje', 'envio
 const CICLO_IDEAL_TORNO = 60; // s, ciclo de diseño para el OEE
 const WIP_MAX = 30;
 const SLA_S = 4 * 3600; // plazo comprometido (h de operación)
+/** Tope de pedidos sin lanzar: acota memoria y CPU si la simulación se deja correr días con poca capacidad. */
+const MAX_BACKLOG = 3000;
 
 export interface MecParams extends CommonParams {
   layout: Layout;
@@ -200,7 +202,7 @@ function step(s: MecState, dt: number) {
     const factor = crisisActiva(s, 'demanda') ? 2 : 1;
     const n = poisson(r, (p.demandaDia / 8) * factor, dt);
     for (let i = 0; i < n; i++) {
-      s.backlog.push({ orderW: s.workT, dueW: s.workT + SLA_S });
+      if (s.backlog.length < MAX_BACKLOG) s.backlog.push({ orderW: s.workT, dueW: s.workT + SLA_S });
       s.dues.push(s.workT + SLA_S);
     }
   }
@@ -502,7 +504,10 @@ const errorRel = (a: number[], b: number[]) => {
 const cacheCal = new Map<string, ReturnType<typeof calibrarSinCache>>();
 export function calibrar(live: MecParams) {
   const key = JSON.stringify(live);
-  if (!cacheCal.has(key)) cacheCal.set(key, calibrarSinCache(live));
+  if (!cacheCal.has(key)) {
+    if (cacheCal.size >= 8) cacheCal.clear();
+    cacheCal.set(key, calibrarSinCache(live));
+  }
   return cacheCal.get(key)!;
 }
 

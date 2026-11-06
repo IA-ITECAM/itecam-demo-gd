@@ -9,6 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import type { Equipo, EstadoEquipo } from '../../../core/types';
+import { esc } from '../ui/format';
 
 export const PALETA = {
   fondo: 0xf5f3ee,
@@ -304,7 +305,7 @@ export class SceneKit {
       const bm = r.beacon.material as THREE.MeshStandardMaterial;
       bm.color.setHex(c);
       bm.emissive.setHex(c);
-      (r.labelEl.firstChild as HTMLElement).innerHTML = `<i style="background:${hex(c)}"></i>${e.nombre}`;
+      (r.labelEl.firstChild as HTMLElement).innerHTML = `<i style="background:${hex(c)}"></i>${esc(e.nombre)}`;
       (r.labelEl.lastChild as HTMLElement).textContent = subtitulo(e);
       r.labelEl.classList.toggle('lbl-crit', e.estado === 'averia' || e.estado === 'sin_material');
       r.label.visible = this.showLabels;

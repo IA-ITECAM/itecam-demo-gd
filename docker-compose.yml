@@ -2,13 +2,32 @@ services:
   gemelos:
     build: .
     image: itecam-demo-gd:latest
-    container_name: itecam-demo-gd
-    ports:
-      - "8080:8080"
-    environment:
-      # Datos públicos (REData + Open-Meteo). Desactivado por defecto: "0".
-      # Con "1" intenta descargarlos al arrancar; si falla, sigue con datos simulados.
-      - DATOS_PUBLICOS=0
-      # Semilla de la simulación (misma semilla = misma demo)
-      - SEMILLA=2026
     restart: unless-stopped
+    # Variables tomadas del fichero .env (en Dokploy: pestaña "Environment").
+    environment:
+      # Contraseña de acceso. Vacía = acceso libre (solo para uso local).
+      - CLAVE_ACCESO=${CLAVE_ACCESO:-}
+      # Secreto para firmar las sesiones. Si se deja vacío, se genera al arrancar
+      # (las sesiones abiertas caducan cuando se reinicia el contenedor).
+      - SECRETO_SESION=${SECRETO_SESION:-}
+      - SESION_HORAS=${SESION_HORAS:-12}
+      # Datos públicos (REData + Open-Meteo): "1" para consultarlos al arrancar.
+      - DATOS_PUBLICOS=${DATOS_PUBLICOS:-0}
+      # Semilla de la simulación (misma semilla = misma demo)
+      - SEMILLA=${SEMILLA:-2026}
+    # Puerto interno para el proxy de Dokploy (Traefik) a través de la red de Docker.
+    expose:
+      - "8080"
+    # Acceso desde este mismo equipo (http://localhost:8080). Solo escucha en 127.0.0.1:
+    # en un VPS NO queda abierto a Internet; el tráfico público entra por el dominio de Dokploy (HTTPS).
+    ports:
+      - "127.0.0.1:${PUERTO_LOCAL:-8080}:8080"
+    # Endurecimiento del contenedor
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 100
+    mem_limit: 512m
+    cpus: 1.5

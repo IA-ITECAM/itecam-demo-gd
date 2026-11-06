@@ -1,4 +1,18 @@
 /** Cliente WebSocket con reconexión automática. */
+
+export function irAlAcceso() {
+  location.href = `/acceso?volver=${encodeURIComponent(location.pathname)}`;
+}
+
+/** Si la API responde 401, la sesión ha caducado. */
+export async function comprobarSesion() {
+  try {
+    const r = await fetch('/api/sesion', { cache: 'no-store', credentials: 'same-origin' });
+    if (r.status === 401) irAlAcceso();
+  } catch {
+    /* sin red: se seguirá reintentando */
+  }
+}
 export type Handler = (msg: any) => void;
 
 export class TwinSocket {
@@ -29,10 +43,14 @@ export class TwinSocket {
       }
       for (const h of this.handlers) h(msg);
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       this.onStatus(false);
       if (this.closed) return;
+      // 4401 = sesión caducada: se vuelve a la pantalla de acceso
+      if (ev.code === 4401) return irAlAcceso();
       this.retry = Math.min(this.retry + 1, 6);
+      // Si el servidor rechaza la conexión, puede ser porque la sesión ha caducado
+      if (this.retry >= 2) void comprobarSesion();
       setTimeout(() => this.connect(), 300 * this.retry);
     };
   }

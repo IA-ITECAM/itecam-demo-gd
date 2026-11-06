@@ -2,7 +2,8 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# --ignore-scripts: no se ejecutan scripts de instalación de terceros (cadena de suministro)
+RUN npm ci --no-audit --no-fund --ignore-scripts
 COPY . .
 RUN npm run build
 
