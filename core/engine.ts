@@ -18,6 +18,8 @@ export interface SeriesPoint {
   /** potencias por equipo (kW), incluye `total` */
   kw: Record<string, number>;
   coste: number;
+  /** true si en ese instante había una crisis activa */
+  crisis: boolean;
 }
 
 export interface ResilienceResult {
@@ -139,7 +141,7 @@ export class TwinRunner<P extends { ctx: ContextoEnergia } = any> {
     const dwc = s.workT - this.lastCoste.w;
     const coste = dwc > 0 ? ((s.L.energyCost - this.lastCoste.c) * 3600) / dwc : 0;
     this.lastCoste = { w: s.workT, c: s.L.energyCost };
-    this.series.push({ w: s.workT, reloj: reloj(s.t), prod, kw: this.model.potencias(s), coste });
+    this.series.push({ w: s.workT, reloj: reloj(s.t), prod, kw: this.model.potencias(s), coste, crisis: crisisActiva(s) });
     if (this.series.length > 144) this.series.shift();
     this.nextSample = s.workT + MUESTREO_S;
     this.seriesVersion++;

@@ -1,5 +1,5 @@
 /** Escena 3D y panel propio del gemelo de mecanizado. */
-import { THREE, PALETA, box, cyl, mat, floorText, FloorPath, SmoothPool, smoothTo, type SceneKit } from '../../web/src/kit/scene-kit';
+import { THREE, PALETA, box, cyl, mat, floorText, FloorPath, SmoothPool, smoothTo, defaultSub, type SceneKit } from '../../web/src/kit/scene-kit';
 import type { TwinClient, TwinApi } from '../../web/src/kit/types';
 import { lineChart, setData, C, type Chart } from '../../web/src/ui/charts';
 import { fmt } from '../../web/src/ui/format';
@@ -91,6 +91,11 @@ const client: TwinClient = {
   kitOptions: { size: [50, 32], camPos: [2, 30, 33], target: [0, 0, 1] },
   build(kit: SceneKit) {
     const w = kit.world;
+    // Etiquetas: en el almacén interesa el material, no la cola
+    kit.labelSub = (e) => {
+      if (e.id === 'almacen') return `material ${e.extra?.['Stock de material'] ?? ''} · pedidos ${e.cola ?? 0}`;
+      return defaultSub(e);
+    };
     w.add(floorText('CÉLULA DE MECANIZADO', -22, -13.5, 1.3));
     const ruta = new FloorPath(PALETA.teal, 0.42, 0.55);
     w.add(ruta.group);
@@ -139,11 +144,11 @@ const client: TwinClient = {
         // Pila de material en el almacén
         const alm = puestos.almacen;
         const stock = alm.getObjectByName('stock')!;
-        const nivel = Math.max(0.02, Math.min(1, v.stock / 90));
+        const nivel = Math.max(0.02, Math.min(1, v.stock / v.stockMax));
         stock.scale.y = nivel;
         stock.position.y = 0.25 + nivel / 2;
         const seg = alm.getObjectByName('seguridad')!;
-        const segN = Math.max(0.02, v.seguridad / 150);
+        const segN = Math.max(0.02, v.seguridad / Math.max(1, v.seguridadMax));
         seg.scale.y = segN;
         seg.position.y = 1.45 + segN / 2;
         // Piezas y carros

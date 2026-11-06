@@ -62,6 +62,9 @@ interface EquipoReg {
   halo?: THREE.Mesh;
   haloTarget: number;
   haloScale: number;
+  /** anillo naranja en el suelo cuando el equipo está «en foco» */
+  anillo?: THREE.Mesh;
+  foco: boolean;
 }
 
 export interface KitOptions {
@@ -292,7 +295,7 @@ export class SceneKit {
       halo.scale.setScalar(0.01);
       obj.add(halo);
     }
-    this.equipos.set(id, { id, obj, bodies, beacon, label, labelEl: el, estado: 'trabajando', halo, haloTarget: 0, haloScale: 0 });
+    this.equipos.set(id, { id, obj, bodies, beacon, label, labelEl: el, estado: 'trabajando', halo, haloTarget: 0, haloScale: 0, foco: false });
   }
 
   /** Actualiza balizas, etiquetas y tintes a partir de la vista del servidor. */
@@ -319,6 +322,10 @@ export class SceneKit {
     r.label.removeFromParent();
     r.labelEl.remove();
     r.obj.removeFromParent();
+    if (r.anillo) {
+      r.anillo.removeFromParent();
+      r.anillo.geometry.dispose();
+    }
     this.equipos.delete(id);
   }
 
@@ -326,6 +333,33 @@ export class SceneKit {
   setHalo(id: string, nivel: number, radioMax: number) {
     const r = this.equipos.get(id);
     if (r?.halo) r.haloTarget = Math.max(0, nivel) * radioMax;
+  }
+
+  /**
+   * Resalta los equipos a los que hay que mirar: anillo naranja pulsante en el suelo
+   * y etiqueta destacada. Ayuda a seguir una crisis cuando pasan muchas cosas a la vez.
+   */
+  setFoco(ids: string[]) {
+    const set = new Set(ids);
+    for (const r of this.equipos.values()) {
+      const foco = set.has(r.id);
+      if (foco === r.foco) continue;
+      r.foco = foco;
+      r.labelEl.classList.toggle('lbl-foco', foco);
+      if (foco && !r.anillo) {
+        const caja = new THREE.Box3().setFromObject(r.obj);
+        const tam = caja.getSize(new THREE.Vector3());
+        const radio = Math.max(1.2, Math.max(tam.x, tam.z) / 2 + 0.6);
+        r.anillo = new THREE.Mesh(
+          new THREE.RingGeometry(radio, radio + 0.3, 48),
+          new THREE.MeshBasicMaterial({ color: PALETA.naranja, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }),
+        );
+        r.anillo.rotation.x = -Math.PI / 2;
+        r.anillo.renderOrder = 4;
+        this.world.add(r.anillo);
+      }
+      if (r.anillo) r.anillo.visible = foco;
+    }
   }
 
   private animateEquipos(dt: number, t: number) {
@@ -348,6 +382,13 @@ export class SceneKit {
       }
       const bm = r.beacon.material as THREE.MeshStandardMaterial;
       bm.emissiveIntensity = crit ? 0.4 + 0.8 * pulse : 0.6;
+      if (r.anillo?.visible) {
+        const p = r.obj.getWorldPosition(new THREE.Vector3());
+        r.anillo.position.set(p.x - this.world.position.x, 0.07, p.z - this.world.position.z);
+        const k = 1 + 0.1 * Math.sin(t * 4);
+        r.anillo.scale.set(k, k, 1);
+        (r.anillo.material as THREE.MeshBasicMaterial).opacity = 0.55 + 0.35 * Math.sin(t * 4);
+      }
       if (r.halo) {
         r.haloScale += (r.haloTarget - r.haloScale) * Math.min(1, dt * 3);
         const s = Math.max(0.01, r.haloScale * (1 + 0.03 * Math.sin(t * 3)));

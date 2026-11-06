@@ -36,7 +36,7 @@ export const config: TwinConfig = {
     {
       id: 'averia',
       titulo: 'Avería de AGV',
-      detalle: 'Dos AGV quedan averiados durante 2 h.',
+      detalle: 'Tres de los cinco AGV quedan averiados durante 2 h.',
       plan: 'Activar dos carretillas manuales de apoyo y reasignar las tareas por prioridad, como se ensayó en el gemelo.',
       metrica: 'produccion',
       duracionH: 2,
@@ -53,7 +53,7 @@ export const config: TwinConfig = {
       id: 'demanda',
       titulo: 'Pico de demanda',
       detalle: 'Entran el doble de pedidos durante 2,5 h.',
-      plan: 'Sumar la carretilla manual de apoyo a la preparación de pedidos mientras dura el pico.',
+      plan: 'Sumar dos carretillas manuales de apoyo a la preparación de pedidos mientras dura el pico.',
       metrica: 'produccion',
       duracionH: 2.5,
     },

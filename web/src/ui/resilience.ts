@@ -8,6 +8,8 @@ export class ResilienceModal {
   private chart: Chart | null = null;
   private last: ResilienceResult | null = null;
   onAplicarPlan: () => void = () => {};
+  /** la página lo actualiza con cada fotograma: si la crisis ha terminado, no se puede aplicar el plan */
+  crisisActiva = true;
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -51,7 +53,7 @@ export class ResilienceModal {
               <span>${esProd ? 'Con plan' : 'Con plan'}: ${fmt(Math.max(0, r.perdidaConPlan), 0)} ${esc(unidad)}</span>
             </div>
             <div class="info"><b>Plan ensayado en el gemelo:</b><br/>${esc(r.crisis.plan)}</div>
-            <button class="btn primario plan-btn" ${planAplicado ? 'disabled' : ''}>${planAplicado ? 'Plan aplicado en vivo ✓' : 'Aplicar el plan en vivo'}</button>
+            <button class="btn primario plan-btn" ${planAplicado || !this.crisisActiva ? 'disabled' : ''}>${!this.crisisActiva ? 'La crisis ya ha terminado' : planAplicado ? 'Plan aplicado en vivo ✓' : 'Aplicar el plan en vivo'}</button>
           </div>
         </div>
       </div>`;

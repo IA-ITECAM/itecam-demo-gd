@@ -199,14 +199,6 @@ describe('Mensajes de negocio de cada comparador', () => {
     const [base, A] = c.escenarios.map((e) => e.kpis);
     expect(A.servicio).toBeGreaterThan(base.servicio);
   });
-  it('Alimentación: A y B cuestan parecido, pero B gasta claramente menos energía y emite menos', () => {
-    const c = new TwinRunner(model('alimentacion'), 2026).comparar();
-    const [, A, B] = c.escenarios.map((e) => e.kpis);
-    expect(Math.abs(B.costeUnidad - A.costeUnidad) / A.costeUnidad).toBeLessThan(0.08);
-    expect(Math.abs(B.plazo - A.plazo) / A.plazo).toBeLessThan(0.15);
-    expect(B.energiaUnidad).toBeLessThan(A.energiaUnidad * 0.7);
-    expect(B.co2Unidad).toBeLessThan(A.co2Unidad * 0.5);
-  });
   it('Mecanizado: la calibración reduce el error contra la serie real', () => {
     const r = new TwinRunner(model('mecanizado'), 2026);
     const res: any = r.command('calibrar')!.data;

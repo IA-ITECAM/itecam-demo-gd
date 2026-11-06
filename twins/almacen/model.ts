@@ -242,8 +242,8 @@ function reconciliarFlota(s: AlmState) {
     }
   }
   // Carretilla manual de apoyo (plan de la crisis de avería)
-  // Con el plan de avería entran dos carretillas manuales (una por AGV averiado); con el del pico, una.
-  const objetivoManual = planActivo(s, 'averia') ? 2 : planActivo(s, 'demanda') ? 1 : 0;
+  // Con el plan de avería o del pico de demanda entran dos carretillas manuales de apoyo.
+  const objetivoManual = planActivo(s, 'averia') || planActivo(s, 'demanda') ? 2 : 0;
   const manuales = s.agvs.filter((a) => a.tipo === 'manual');
   for (let i = manuales.length; i < objetivoManual; i++) s.agvs.push(nuevoAgv(98 + i, 'manual', s.seed, 1e12));
   for (const m of manuales.slice(objetivoManual)) if (!m.tarea) s.agvs.splice(s.agvs.indexOf(m), 1);
@@ -482,8 +482,8 @@ function step(s: AlmState, dt: number) {
 
 function onCrisis(s: AlmState) {
   if (s.crisis?.id === 'averia') {
-    // Fallan los dos AGV más ocupados
-    const cands = s.agvs.filter((a) => a.tipo === 'agv' && a.estado !== 'averiado').sort((x, y) => y.ocupEma - x.ocupEma).slice(0, 2);
+    // Fallan los tres AGV más ocupados
+    const cands = s.agvs.filter((a) => a.tipo === 'agv' && a.estado !== 'averiado').sort((x, y) => y.ocupEma - x.ocupEma).slice(0, 3);
     for (const a of cands) {
       if (a.estado === 'cargando' || a.estado === 'a_cargar') liberarCargador(s, a);
       a.estado = 'averiado';
@@ -581,12 +581,16 @@ function view(s: AlmState): AlmView {
   if (ped > 25) alertas.push({ nivel: 'aviso', texto: `${ped} pedidos en cola` });
   if (crisisActiva(s, 'demanda')) alertas.push({ nivel: 'aviso', texto: 'Pico de demanda: pedidos ×2' });
   if (crisisActiva(s, 'energia')) alertas.push({ nivel: 'aviso', texto: 'Precio de la energía ×3' });
-  if (s.agvs.some((a) => a.tipo === 'manual')) alertas.push({ nivel: 'info', texto: 'Carretilla manual de apoyo activa' });
+  const nManual = s.agvs.filter((a) => a.tipo === 'manual').length;
+  if (nManual) alertas.push({ nivel: 'info', texto: `${nManual} carretilla${nManual > 1 ? 's' : ''} manual${nManual > 1 ? 'es' : ''} de apoyo` });
   if (libres === nAgv && ped === 0) alertas.push({ nivel: 'info', texto: 'Flota libre' });
 
+  const { narrativa, foco } = explicar(s, { ped, averiados, nManual });
   return {
     equipos,
     alertas,
+    narrativa,
+    foco,
     agvs,
     pedidosPendientes: ped,
     ubicacionesPendientes: ubi,
@@ -595,6 +599,42 @@ function view(s: AlmState): AlmView {
     flota: s.p.flota,
     cargadores: s.cargadores.map((c) => (c === null ? 0 : 1)),
   };
+}
+
+/** Qué está pasando ahora, en una frase, y qué mirar. */
+function explicar(s: AlmState, e: { ped: number; averiados: number; nManual: number }): { narrativa: string; foco: string[] } {
+  const c = s.crisis && crisisActiva(s) ? s.crisis : null;
+  const plan = !!c?.plan;
+  const min = c ? Math.max(0, Math.round((c.wHasta - s.workT) / 60)) : 0;
+  const averiadosIds = s.agvs.filter((a) => a.estado === 'averiado').map((a) => `agv${a.id}`);
+  const manuales = s.agvs.filter((a) => a.tipo === 'manual').map((a) => `agv${a.id}`);
+  const dem = Math.round(demandaHora(s));
+  if (c?.id === 'averia') {
+    if (plan) return { narrativa: `${e.averiados} AGV siguen averiados (rojos, ${min} min más), pero ${e.nManual} carretillas manuales (naranjas) los cubren. Cola de pedidos: ${e.ped}.`, foco: [...averiadosIds, ...manuales, 'expedicion'] };
+    return { narrativa: `${e.averiados} AGV averiados (en rojo). El resto no da abasto: la cola de pedidos en expedición crece (${e.ped}).`, foco: [...averiadosIds, 'expedicion'] };
+  }
+  if (c?.id === 'proveedor') {
+    if (plan) return { narrativa: `No llegan camiones, pero los pedidos sin stock se sirven desde la zona de RESERVA (abajo a la izquierda): recorridos más largos, aunque salen. Cola: ${e.ped}.`, foco: ['recepcion', 'expedicion'] };
+    return { narrativa: `No llegan camiones: cada vez más referencias se quedan sin stock. ${s.bloqueados} pedidos esperan material (cajas naranjas en expedición).`, foco: ['recepcion', 'expedicion'] };
+  }
+  if (c?.id === 'demanda') {
+    if (plan) return { narrativa: `Pico de ${dem} pedidos/h con el plan: dos carretillas de apoyo (naranjas) preparan pedidos. Cola en expedición: ${e.ped}.`, foco: [...manuales, 'expedicion'] };
+    return { narrativa: `Pico de demanda: entran ${dem} pedidos/h y la flota no da abasto. La cola en expedición crece (${e.ped}).`, foco: ['expedicion'] };
+  }
+  if (c?.id === 'energia') {
+    return {
+      narrativa: plan
+        ? `Electricidad ×3 con el plan: solo se cargan las baterías imprescindibles y se apaga la luz de pasillos sin actividad. Consumo: ${(s.cargaKw + s.luzKw).toFixed(0)} kW.`
+        : `La electricidad cuesta el triple: los pedidos salen igual, pero sube el coste de la carga de baterías y la iluminación (${(s.cargaKw + s.luzKw).toFixed(0)} kW).`,
+      foco: ['cargadores'],
+    };
+  }
+  if (e.averiados) return { narrativa: `Avería imprevista de ${e.averiados} AGV (en rojo): se repara en unos minutos.`, foco: averiadosIds };
+  const h = horaDecimal(s.t);
+  const punta = (h >= 10 && h < 12) || (h >= 17 && h < 19);
+  if (punta) return { narrativa: `Hora punta de pedidos (${dem}/h): mira cómo crece y se vacía la cola de expedición (${e.ped}).`, foco: ['expedicion'] };
+  if (e.ped > 25) return { narrativa: `Se acumulan pedidos (${e.ped}): la flota está al límite.`, foco: ['expedicion'] };
+  return { narrativa: 'Funcionamiento normal: los AGV recogen palés en las estanterías y los llevan a expedición; cuando les baja la batería, van a cargar.', foco: [] };
 }
 
 function potencias(s: AlmState): Record<string, number> {

@@ -58,10 +58,10 @@ export const config: TwinConfig = {
     {
       id: 'proveedor',
       titulo: 'El proveedor no entrega',
-      detalle: 'No llega barra de acero durante 5 h.',
-      plan: 'Usar el stock de seguridad que se dimensionó con el gemelo (+150 piezas de material).',
+      detalle: 'No llega barra de acero durante 4 h. El almacén solo cubre ≈1 h.',
+      plan: 'Usar el stock de seguridad dimensionado con el gemelo (+50 piezas): retrasa la parada, aunque no la evita del todo.',
       metrica: 'produccion',
-      duracionH: 5,
+      duracionH: 4,
     },
     {
       id: 'demanda',

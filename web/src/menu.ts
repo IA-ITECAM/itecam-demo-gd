@@ -16,12 +16,6 @@ const ILUSTRACION: Record<string, string> = {
     <rect x="${44 + i * 62}" y="48" width="14" height="14" fill="#c8a26b"/><rect x="${62 + i * 62}" y="68" width="14" height="14" fill="#c8a26b"/><rect x="${44 + i * 62}" y="90" width="14" height="14" fill="#E8731A"/>`).join('')}
     <rect x="70" y="130" width="34" height="18" rx="4" fill="#0B7373"/><rect x="190" y="130" width="34" height="18" rx="4" fill="#0B7373"/>
     <path d="M20 156 H300" stroke="#0B7373" stroke-width="3" stroke-dasharray="6 6"/></svg>`,
-  alimentacion: `<svg viewBox="0 0 320 170"><rect width="320" height="170" fill="#ebe6db"/>
-    <rect x="20" y="104" width="280" height="10" fill="#5b6672"/>
-    <circle cx="96" cy="86" r="44" fill="#E8731A" opacity="0.25"/><rect x="60" y="66" width="72" height="38" rx="6" fill="#0E1A2B"/>
-    <rect x="148" y="72" width="60" height="32" rx="6" fill="#9aa5b1"/><rect x="222" y="78" width="30" height="26" rx="4" fill="#0B7373"/>
-    <rect x="262" y="74" width="30" height="30" fill="#c8a26b"/>
-    ${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${30 + i * 44}" y="96" width="12" height="8" fill="#f5f3ee"/>`).join('')}</svg>`,
 };
 
 export function renderMenu(root: HTMLElement) {
@@ -32,7 +26,7 @@ export function renderMenu(root: HTMLElement) {
       <div>
         <div class="menu-kicker">Tendencias de la Industria 5.0</div>
         <h1>Gemelos digitales de nueva generación</h1>
-        <p class="menu-lead">Tres plantas tipo de pyme simuladas en tiempo real. Provoca crisis, compara escenarios y observa las consecuencias antes de decidir.</p>
+        <p class="menu-lead">Dos plantas tipo de pyme simuladas en tiempo real. Provoca crisis, compara escenarios y observa las consecuencias antes de decidir.</p>
       </div>
       <div class="fila"><span class="pill" id="menu-datos"><i class="dot sim"></i> Datos simulados</span><a class="btn hidden" id="menu-salir" href="${url('salir')}">Cerrar sesión</a></div>
     </div>

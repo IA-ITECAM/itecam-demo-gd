@@ -44,6 +44,8 @@ export interface MecParams extends CommonParams {
   manipulacion: number;
   suministroHora: number;
   stockMax: number;
+  /** stock de seguridad que solo se usa con el plan de la crisis del proveedor */
+  seguridad: number;
   kw: Record<MaqId, [number, number]>; // [en espera, trabajando]
   auxKw: number;
   sinAverias: boolean;
@@ -89,6 +91,7 @@ export interface MecState extends BaseState<MecParams> {
   nextId: number;
   enviadas: number;
   auxKw: number;
+  proveedorCortado: boolean;
 }
 
 export interface MecView extends BaseView {
@@ -99,6 +102,8 @@ export interface MecView extends BaseView {
   piezas: number[];
   stock: number;
   seguridad: number;
+  stockMax: number;
+  seguridadMax: number;
   backlog: number;
   torno2Activo: boolean;
   enviadas: number;
@@ -142,7 +147,9 @@ function defaultParams(): MecParams {
     velCarro: 1.5,
     manipulacion: 4,
     suministroHora: 45,
-    stockMax: 90,
+    // Colchón pequeño (≈1,2 h de consumo): si el proveedor falla, la célula se para pronto
+    stockMax: 40,
+    seguridad: 50,
     kw: { corte: [4, 15], torno: [5, 22], torno2: [3, 16], montaje: [2, 6] },
     auxKw: 20,
     sinAverias: false,
@@ -166,7 +173,8 @@ function init(p: MecParams, seed: number): MecState {
     backlog: [],
     dues: [],
     stock: p.stockMax * 0.8,
-    seguridad: 150,
+    seguridad: p.seguridad,
+    proveedorCortado: false,
     nextId: 1,
     enviadas: 0,
     auxKw: p.auxKw,
@@ -212,7 +220,16 @@ function step(s: MecState, dt: number) {
   }
 
   // --- Suministro de material
-  if (!crisisActiva(s, 'proveedor')) s.stock = Math.min(p.stockMax, s.stock + (p.suministroHora * dt) / 3600);
+  if (crisisActiva(s, 'proveedor')) s.proveedorCortado = true;
+  else {
+    // Al acabar la crisis llega el camión retrasado y el almacén se repone de golpe
+    if (s.proveedorCortado) {
+      s.proveedorCortado = false;
+      s.stock = p.stockMax;
+      s.seguridad = p.seguridad;
+    }
+    s.stock = Math.min(p.stockMax, s.stock + (p.suministroHora * dt) / 3600);
+  }
 
   // --- Lanzamiento de piezas (CONWIP)
   let wip = s.colaCarro.length + s.colas.reduce((a, c) => a + c.length, 0) + s.carros.filter((c) => c.pieza !== null).length + s.maq.filter((m) => m.pieza !== null).length;
@@ -385,17 +402,19 @@ function view(s: MecState): MecView {
   const t2 = torno2Habilitado(s);
   const enTurno = enVentana(s.t, 6, finTurno(p));
   const equipos: Equipo[] = [];
-  const sinMaterial = s.stock < 1 && !(planActivo(s, 'proveedor') && s.seguridad >= 1);
+  const usandoSeguridad = s.stock < 1 && planActivo(s, 'proveedor') && s.seguridad >= 1;
+  const sinMaterial = s.stock < 1 && !usandoSeguridad;
+  const wip = Object.keys(s.piezas).length;
   equipos.push({
     id: 'almacen',
     nombre: NOMBRES.almacen,
-    estado: sinMaterial ? 'sin_material' : s.stock < 15 ? 'alerta' : 'trabajando',
+    estado: sinMaterial ? 'sin_material' : usandoSeguridad || s.stock < 10 ? 'alerta' : 'trabajando',
     util: s.stock / p.stockMax,
     kw: 0,
     cola: s.backlog.length,
     extra: {
       'Stock de material': `${Math.floor(s.stock)} uds`,
-      'Stock de seguridad': planActivo(s, 'proveedor') ? `${Math.floor(s.seguridad)} uds (en uso)` : 'reservado',
+      'Stock de seguridad': usandoSeguridad ? `${Math.floor(s.seguridad)} uds (en uso)` : `${Math.floor(s.seguridad)} uds (reservado)`,
       'Pedidos pendientes': s.backlog.length,
       Suministro: crisisActiva(s, 'proveedor') ? 'INTERRUMPIDO' : `${p.suministroHora} uds/h`,
     },
@@ -434,25 +453,78 @@ function view(s: MecState): MecView {
   if (!torno.up) alertas.push({ nivel: 'critico', texto: 'Torno CNC averiado' });
   if (s.colas[2].length > 12) alertas.push({ nivel: 'aviso', texto: `Cola en el torno: ${s.colas[2].length} piezas` });
   if (sinMaterial) alertas.push({ nivel: 'critico', texto: 'Sin material en almacén' });
-  else if (s.stock < 15) alertas.push({ nivel: 'aviso', texto: 'Stock de material bajo' });
+  else if (usandoSeguridad) alertas.push({ nivel: 'aviso', texto: `Usando stock de seguridad: ${Math.floor(s.seguridad)} uds` });
+  else if (s.stock < 10) alertas.push({ nivel: 'aviso', texto: 'Stock de material bajo' });
   if (s.backlog.length > 40) alertas.push({ nivel: 'aviso', texto: `${s.backlog.length} pedidos sin lanzar` });
   if (crisisActiva(s, 'energia')) alertas.push({ nivel: 'aviso', texto: 'Precio de la energía ×3' });
   if (t2) alertas.push({ nivel: 'info', texto: 'Torno alternativo en marcha' });
   if (!enTurno) alertas.push({ nivel: 'info', texto: 'Fuera de turno' });
 
+  const { narrativa, foco } = explicar(s, { sinMaterial, usandoSeguridad, wip, enTurno, t2 });
   return {
     equipos,
     alertas,
+    narrativa,
+    foco,
     layout: p.layout,
     posiciones: LAYOUTS[p.layout],
     ruta: rutaLayout(p.layout),
     piezas,
     stock: s.stock,
     seguridad: s.seguridad,
+    stockMax: p.stockMax,
+    seguridadMax: p.seguridad,
     backlog: s.backlog.length,
     torno2Activo: t2,
     enviadas: s.enviadas,
   };
+}
+
+/** Qué está pasando ahora, en una frase, y qué equipos mirar. */
+function explicar(
+  s: MecState,
+  e: { sinMaterial: boolean; usandoSeguridad: boolean; wip: number; enTurno: boolean; t2: boolean },
+): { narrativa: string; foco: string[] } {
+  const c = s.crisis && crisisActiva(s) ? s.crisis : null;
+  const plan = !!c?.plan;
+  const colaTorno = s.colas[2].length;
+  const min = c ? Math.max(0, Math.round((c.wHasta - s.workT) / 60)) : 0;
+  if (!e.enTurno) return { narrativa: 'Fuera de turno: la célula está parada hasta las 06:00.', foco: [] };
+  if (c?.id === 'proveedor') {
+    if (e.sinMaterial && e.wip > 0)
+      return { narrativa: `Se ha acabado el material${plan ? ' (también el de seguridad)' : ''}: la célula termina las ${e.wip} piezas en curso y se va a parar.`, foco: ['almacen'] };
+    if (e.sinMaterial)
+      return { narrativa: `Célula parada por falta de material. Los pedidos se acumulan (${s.backlog.length} sin lanzar) hasta que llegue el camión, dentro de ${min} min.`, foco: ['almacen'] };
+    if (e.usandoSeguridad)
+      return { narrativa: `Plan en marcha: la célula sigue trabajando con el stock de seguridad. Quedan ${Math.floor(s.seguridad)} piezas; si se agotan antes de que llegue el camión, se parará.`, foco: ['almacen'] };
+    return {
+      narrativa: `El proveedor no entrega. Quedan ${Math.floor(s.stock)} piezas de material en el almacén${plan ? ` y ${Math.floor(s.seguridad)} de seguridad` : ''}: cuando se acaben, la célula se parará.`,
+      foco: ['almacen'],
+    };
+  }
+  if (c?.id === 'averia') {
+    if (plan) return { narrativa: `El torno CNC sigue averiado (${min} min más), pero el torno alternativo trabaja: sale producción, aunque más despacio.`, foco: ['torno', 'torno2'] };
+    return { narrativa: `El torno CNC está averiado (${min} min más). Las piezas se acumulan delante (cola de ${colaTorno}) y casi no sale producción.`, foco: ['torno'] };
+  }
+  if (c?.id === 'demanda') {
+    if (plan) return { narrativa: `Pico de pedidos con el plan: torno alternativo y segundo carro en marcha; la producción sube para absorberlo (${s.backlog.length} pedidos pendientes).`, foco: ['torno', 'torno2', 'almacen'] };
+    return { narrativa: `Entra el doble de pedidos, pero la célula ya trabaja al máximo: los pedidos pendientes crecen (${s.backlog.length}). Mira el almacén y la cola del torno.`, foco: ['almacen', 'torno'] };
+  }
+  if (c?.id === 'energia') {
+    const kw = s.auxKw + s.maq.reduce((a, m) => a + m.kw, 0);
+    const eur = kw * precioElec(s.p.ctx, s.t) * 3;
+    return {
+      narrativa: plan
+        ? `Electricidad ×3 con el plan: equipos en espera apagados y consumos auxiliares a horas valle. Ahora: ${kw.toFixed(0)} kW (${eur.toFixed(1)} €/h).`
+        : `La electricidad cuesta el triple: la producción no cambia, pero sí el coste. Ahora: ${kw.toFixed(0)} kW (${eur.toFixed(1)} €/h). Mira «Energía consumida».`,
+      foco: [],
+    };
+  }
+  if (!s.maq[1].up) return { narrativa: 'Avería imprevista del torno CNC: mira cómo crece su cola mientras se repara.', foco: ['torno'] };
+  if (e.sinMaterial) return { narrativa: 'Falta material: la célula espera a que llegue más barra.', foco: ['almacen'] };
+  if (colaTorno > 12) return { narrativa: `El torno CNC es el cuello de botella: su cola ha llegado a ${colaTorno} piezas.`, foco: ['torno'] };
+  if (e.t2) return { narrativa: 'Funcionamiento normal, con el torno alternativo también en marcha.', foco: [] };
+  return { narrativa: 'Funcionamiento normal. El torno CNC marca el ritmo de la célula: es el cuello de botella.', foco: [] };
 }
 
 function potencias(s: MecState): Record<string, number> {

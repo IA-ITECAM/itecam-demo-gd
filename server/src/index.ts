@@ -178,7 +178,7 @@ if (INDEX_HTML) {
   // index.html siempre con el <base> inyectado, nunca el fichero tal cual
   r.get('/index.html', (_req, res) => res.redirect(301, BASE));
   r.use(express.static(PUBLIC_DIR, { index: false, maxAge: '1h', dotfiles: 'ignore' }));
-  // Rutas de la SPA: "/", "/mecanizado", "/almacen", "/alimentacion"…
+  // Rutas de la SPA: "/", "/mecanizado", "/almacen"…
   r.get(/^\/(?!api\/|ws)[a-z0-9\-]*$/i, (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.type('html').send(INDEX_HTML);

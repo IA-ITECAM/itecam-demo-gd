@@ -43,12 +43,13 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
         <div class="alerts"></div>
         <div class="crisis-banner hidden"></div>
         <div class="ficha hidden"></div>
+        <div class="narrativa" aria-live="polite"><b>Qué está pasando</b><span></span></div>
         <div class="legend sec"></div>
         <div class="hint sec">Arrastra para girar · rueda para zoom · clic en un equipo para ver su ficha</div>
       </section>
       <aside class="side">
         <div class="kpis"></div>
-        <div class="card"><h3>Ritmo de producción <small>${esc(cfg.unidadPlural)}/h · última hora</small></h3><div class="chart-box"><canvas class="ch-prod"></canvas></div></div>
+        <div class="card"><h3>Ritmo de producción <small>${esc(cfg.unidadPlural)}/h · <span style="color:var(--naranja);font-weight:700">naranja = en crisis</span></small></h3><div class="chart-box"><canvas class="ch-prod"></canvas></div></div>
         <nav class="tabs"></nav>
         <div class="tab-body"></div>
       </aside>
@@ -110,8 +111,19 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   }
 
   // ---------- Gráfica de producción ----------
+  const enCrisis = (i: number) => !!series[i]?.crisis;
   const chProd: Chart = lineChart($('.ch-prod') as HTMLCanvasElement, [
-    { label: 'Ritmo', data: [], borderColor: C.teal, backgroundColor: C.tealSuave, fill: true },
+    {
+      label: 'Ritmo',
+      data: [],
+      borderColor: C.teal,
+      backgroundColor: C.tealSuave,
+      fill: true,
+      segment: {
+        borderColor: (c: any) => (enCrisis(c.p1DataIndex) ? C.naranja : C.teal),
+        backgroundColor: (c: any) => (enCrisis(c.p1DataIndex) ? C.naranjaSuave : C.tealSuave),
+      },
+    } as any,
   ]);
   function renderSeries() {
     setData(chProd, series.map((p) => p.reloj.split('· ')[1] ?? p.reloj), [series.map((p) => p.prod)]);
@@ -238,6 +250,19 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   resModal.onAplicarPlan = () => socket.send('plan');
   cmpModal.onVer3D = (id: ScenarioId) => socket.send('escenario', { id });
 
+  // ---------- Narración: qué está pasando y dónde mirar ----------
+  let narrativaPrevia = '';
+  function renderNarrativa(f: any) {
+    const caja = $('.narrativa');
+    const texto: string = f.view.narrativa ?? '';
+    caja.classList.toggle('hidden', !texto);
+    caja.classList.toggle('crisis', !!f.crisis);
+    if (texto !== narrativaPrevia) {
+      narrativaPrevia = texto;
+      caja.querySelector('span')!.textContent = texto;
+    }
+  }
+
   // ---------- Avisos breves del servidor ----------
   let avisoTimer: number | undefined;
   function aviso(texto: string) {
@@ -254,13 +279,16 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   }
 
   // ---------- Alertas ----------
+  const ORDEN_ALERTA: Record<string, number> = { critico: 0, aviso: 1, info: 2 };
   let alertKey = '';
   function renderAlertas(v: any) {
     const k = JSON.stringify(v.alertas);
     if (k === alertKey) return;
     alertKey = k;
     $('.alerts').innerHTML = (v.alertas as any[])
-      .slice(0, 6)
+      .slice()
+      .sort((a: any, b: any) => ORDEN_ALERTA[a.nivel] - ORDEN_ALERTA[b.nivel])
+      .slice(0, 3)
       .map((a) => `<div class="alerta ${a.nivel}">${a.nivel === 'critico' ? '⛔ ' : a.nivel === 'aviso' ? '⚠ ' : ''}${esc(a.texto)}</div>`)
       .join('');
   }
@@ -353,6 +381,9 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
         renderKpis(msg);
         renderBanner(msg);
         renderAlertas(msg.view);
+        renderNarrativa(msg);
+        kit?.setFoco(msg.view.foco ?? []);
+        resModal.crisisActiva = !!msg.crisis;
         if (frameCount++ % 5 === 0) registrarHistorial(msg.view);
         kit?.updateEquipos(msg.view.equipos);
         handle?.update(msg.view, msg);
@@ -360,6 +391,8 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
         break;
       }
       case 'resiliencia':
+        // la curva llega justo al lanzar la crisis, antes del primer fotograma que la incluye
+        resModal.crisisActiva = true;
         resModal.open(msg.data, false);
         page.querySelectorAll<HTMLButtonElement>('.btn-vercurva').forEach((b) => (b.disabled = false));
         break;

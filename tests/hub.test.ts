@@ -71,10 +71,10 @@ describe('Simulación en el navegador (versión estática)', () => {
 
   it('da exactamente los mismos resultados que la versión con servidor', async () => {
     const { hub, de } = nuevo();
-    hub.abrir('a', 'alimentacion');
+    hub.abrir('a', 'almacen');
     await hub.comando('a', JSON.stringify({ cmd: 'comparar' }));
     const local = de('a', 'comparador')[0].data.escenarios.map((e: any) => e.kpis);
-    const servidor = new TwinRunner(MODELS.find((m) => m.config.id === 'alimentacion')!, 2026).comparar().escenarios.map((e) => e.kpis);
+    const servidor = new TwinRunner(MODELS.find((m) => m.config.id === 'almacen')!, 2026).comparar().escenarios.map((e) => e.kpis);
     expect(local).toEqual(servidor);
   });
 });

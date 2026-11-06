@@ -96,6 +96,10 @@ export interface Alerta {
 export interface BaseView {
   equipos: Equipo[];
   alertas: Alerta[];
+  /** Una o dos frases que explican qué está pasando ahora y dónde mirar */
+  narrativa?: string;
+  /** Equipos que conviene mirar ahora (se resaltan en 3D) */
+  foco?: string[];
 }
 
 export interface CommandContext<P> {

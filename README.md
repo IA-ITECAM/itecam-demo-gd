@@ -1,6 +1,6 @@
 # Gemelos digitales de nueva generación · Demo Industria 5.0
 
-Aplicación de demostración para el webinar **«Tendencias de la Industria 5.0: gemelos digitales de nueva generación»**, pensada para pymes. Incluye tres gemelos digitales de planta, cada uno con escena 3D, datos en tiempo real (simulados), crisis provocables, curva de resiliencia y comparador de escenarios «¿qué pasa si…?».
+Aplicación de demostración para el webinar **«Tendencias de la Industria 5.0: gemelos digitales de nueva generación»**, pensada para pymes. Incluye dos gemelos digitales de planta (mecanizado y almacén), cada uno con escena 3D, datos en tiempo real (simulados), crisis provocables, curva de resiliencia y comparador de escenarios «¿qué pasa si…?».
 
 - Dos formas de publicarla:
   - **Con servidor** (Docker, VPS, Dokploy o nginx): un solo contenedor y un solo puerto, **http://localhost:8080**. Admite contraseña de acceso.
@@ -66,7 +66,7 @@ npm run typecheck
 
 ## 2. Qué hay en la pantalla
 
-**Menú principal (`/`)**: una tarjeta por gemelo. Cada gemelo tiene su propia ruta (`/mecanizado`, `/almacen`, `/alimentacion`) y desde cualquiera de ellos se vuelve con **← Menú**.
+**Menú principal (`/`)**: una tarjeta por gemelo. Cada gemelo tiene su propia ruta (`/mecanizado`, `/almacen`) y desde cualquiera de ellos se vuelve con **← Menú**.
 
 **Barra superior**: volver al menú, reloj simulado, velocidad (×1, ×5, ×20), pausa, reiniciar (misma semilla), qué escenario se está viendo en 3D, indicador **Datos simulados / Datos públicos** (al pulsarlo se activan o desactivan los datos públicos), botón **VR** (solo si el navegador admite WebXR) y **modo presentación**.
 
@@ -76,7 +76,14 @@ npm run typecheck
 
 - **Provocar crisis**: cuatro botones grandes.
 - **¿Qué pasa si…?**: el comparador de escenarios Base / A / B.
-- **Pestaña propia** de cada gemelo: *Planta y calibración*, *Flota de AGV* o *Energía*.
+- **Pestaña propia** de cada gemelo: *Planta y calibración* o *Flota de AGV*.
+
+**Cómo seguir lo que pasa** (pensado para cuando ocurren muchas cosas a la vez):
+
+- **«Qué está pasando»** (franja oscura abajo, en el centro de la escena): una o dos frases que explican en cada momento lo importante y dónde mirar. Por ejemplo: *«El proveedor no entrega. Quedan 12 piezas de material: cuando se acaben, la célula se parará»*. Durante una crisis se vuelve naranja.
+- **Foco**: los equipos a los que hay que mirar se rodean de un **anillo naranja pulsante** y su etiqueta se destaca.
+- **Gráfica de producción**: los tramos con crisis activa se dibujan en **naranja**, así se ve de un vistazo cuándo cae la producción y cuándo se recupera.
+- **Alertas** (arriba a la izquierda): solo las 3 más graves, primero las críticas.
 
 **Atajos de teclado**: `espacio` pausa · `1` / `5` / `2` velocidad ×1 / ×5 / ×20 · `P` modo presentación · `Esc` cierra ventanas.
 
@@ -86,11 +93,11 @@ npm run typecheck
 
 ---
 
-## 3. Los tres gemelos
+## 3. Los dos gemelos
 
 ### 3.1 Mecanizado (pyme metalmecánica)
 
-Célula con **almacén de barra → sierra de corte → torno CNC → montaje → envío**, más un **torno alternativo** que normalmente está parado (se ve semitransparente). Las piezas (cilindros) esperan en colas visibles y se mueven en un carro naranja por el trazado verde del suelo. Hay tiempos de ciclo variables, averías aleatorias (MTBF/MTTR), transporte interno, un turno de 06:00 a 14:00 (de noche el reloj salta al día siguiente) y pedidos con plazo comprometido.
+Célula con **almacén de barra → sierra de corte → torno CNC → montaje → envío**, más un **torno alternativo** que normalmente está parado (se ve semitransparente). Las piezas (cilindros) esperan en colas visibles y se mueven en un carro naranja por el trazado verde del suelo. Hay tiempos de ciclo variables, averías aleatorias (MTBF/MTTR), transporte interno, un turno de 06:00 a 14:00 (de noche el reloj salta al día siguiente) y pedidos con plazo comprometido. El almacén de barra trabaja con poco colchón (40 piezas, ≈1 h de consumo) y guarda aparte un **stock de seguridad** de 50 piezas (la caja naranja de arriba), que solo se usa con el plan de la crisis del proveedor.
 
 - **Layout** (pestaña *Planta y calibración*): **Funcional** ↔ **En línea**. Los equipos se desplazan en 3D y el trazado se redibuja. El recorrido de la pieza pasa de **117 m a 32 m (−73 %)**.
 - **Calibración**: la gráfica compara la producción **real** (histórico de 24 h con paradas) con la del **gemelo**. Sin calibrar, el gemelo usa los tiempos de catálogo y va muy por encima (error ≈ 49 %). Al pulsar **Calibrar**, el gemelo carga las paradas registradas y ajusta los tiempos de ciclo paso a paso hasta seguir a la realidad (error ≈ 4 %). Al final aparece una tabla con los parámetros antes y después.
@@ -117,38 +124,24 @@ Nave con estanterías, **recepción** (izquierda), **expedición** (derecha), zo
 
   A da el mejor servicio y B el menor coste **sin comprar AGV**.
 
-### 3.3 Alimentación y envasado (energía y sostenibilidad)
-
-Línea continua (24 h) de **dosificación → horno túnel → túnel de enfriamiento → acumulación → envasadora → paletizado**. Las bandejas cambian de color al hornearse y los palés se apilan al final. El consumo de cada equipo se ve en 3D mediante un **halo naranja que crece con la potencia** y en la gráfica apilada de la pestaña **Energía**, junto con la potencia, el coste por hora, los kg de CO₂ por hora y el precio eléctrico del momento.
-
-- **Escenario energético**: «Producir lo mismo con menos energía». A = horno de gas nuevo; B = horno eléctrico con bomba de calor y recuperación del calor del frío. En la pestaña *Energía* puedes ver A o B en 3D (el halo del horno encoge con B) y lanzar la comparación.
-
-| (24 h) | A · Gas nuevo | B · Eléctrico + bomba de calor |
-|---|---|---|
-| Producción | ≈ 6.821 cajas/día | ≈ 6.814 cajas/día |
-| Coste por caja | ≈ 0,75 € | ≈ 0,77 € (parecido) |
-| Plazo | ≈ 21 min | ≈ 22 min (parecido) |
-| Energía por caja | ≈ 1,36 kWh | **≈ 0,76 kWh (−44 %)** |
-| Emisiones por caja | ≈ 0,24 kg CO₂ | **≈ 0,09 kg CO₂ (−63 %)** |
-
 ---
 
 ## 4. Cómo provocar cada crisis
 
 En cualquier gemelo, abre la pestaña **Provocar crisis** y pulsa uno de los cuatro botones:
 
-| Crisis | Mecanizado | Almacén | Alimentación |
-|---|---|---|---|
-| 🔧 Avería | El torno CNC se para 2,5 h | 2 AGV averiados 2 h | El horno se para 2 h (se pierde el producto que había dentro) |
-| 🚚 Proveedor | Sin barra de acero 5 h | Sin camiones 4 h: referencias sin stock | Sin materia prima 5 h |
-| 📈 Pico de demanda | Doble de pedidos 3 h | Doble de pedidos 2,5 h | +60 % de pedidos 4 h |
-| ⚡ Energía | Electricidad ×3 durante 6 h | Electricidad ×3 durante 6 h | Electricidad ×3 durante 8 h (sin plan se recorta producción) |
+| Crisis | Mecanizado | Almacén |
+|---|---|---|
+| 🔧 Avería | El torno CNC se para 2,5 h. **Plan:** el torno alternativo produce mientras tanto (más despacio). | 3 de los 5 AGV averiados 2 h. **Plan:** dos carretillas manuales de apoyo (naranjas). |
+| 🚚 Proveedor | No llega barra durante 4 h. El almacén se vacía en ≈1 h y **la célula se para**; al acabar la crisis llega el camión retrasado. **Plan:** stock de seguridad (+50 piezas), que **retrasa la parada pero no la evita del todo**. | No llegan camiones 4 h: cada vez más pedidos se quedan sin stock. **Plan:** servirlos desde la zona de reserva. |
+| 📈 Pico de demanda | Doble de pedidos 3 h: la célula ya va al máximo y crecen los pedidos pendientes. **Plan:** torno alternativo y segundo carro. | Doble de pedidos 2,5 h. **Plan:** dos carretillas de apoyo. |
+| ⚡ Energía | Electricidad ×3 durante 6 h: la producción no cambia, sube el coste. **Plan:** apagar equipos en espera y desplazar consumos auxiliares. | Electricidad ×3 durante 6 h. **Plan:** cargar solo lo imprescindible y apagar luz por zonas. |
 
 Al lanzarla:
 
 1. La escena 3D lo muestra al instante: el equipo se pone en rojo, aparecen alertas y las colas crecen. Arriba aparece una franja naranja con el tiempo restante de la crisis.
 2. Se abre la **curva de resiliencia**. El gemelo bifurca el estado actual en tres ramas con la misma semilla (sin crisis, crisis **sin plan** y crisis **con plan ensayado**) y las simula hacia delante. La zona sombreada entre las dos curvas es la **producción que no se pierde** (o el coste que se evita, en las crisis de energía de mecanizado y almacén). Al lado se muestra el total salvado y el plan.
-3. Con **Aplicar plan ensayado** (en la franja o en la ventana), el plan se aplica en vivo y se ve en 3D: se enciende el torno alternativo, aparece la carretilla manual de apoyo, se usa el stock de seguridad, etc.
+3. Con **Aplicar plan ensayado** (en la franja o en la ventana), el plan se aplica en vivo y se ve en 3D: se enciende el torno alternativo, aparecen las carretillas manuales de apoyo, se empieza a gastar el stock de seguridad, etc. La franja «Qué está pasando» cuenta en cada momento cómo evoluciona la crisis (por ejemplo, cuántas piezas de seguridad quedan).
 4. La **✕** de la franja termina la crisis antes de tiempo.
 
 Planes ensayados: redirigir a una máquina alternativa, usar el stock de seguridad o la zona de reserva, reforzar con un recurso de apoyo, subir la cadencia hasta el máximo validado o desplazar consumos a horas valle. Las crisis lucen más en los momentos de más actividad (por ejemplo, a media mañana).
@@ -157,30 +150,24 @@ Planes ensayados: redirigir a una máquina alternativa, usar el stock de segurid
 
 ## 5. Guion de demo (20 minutos)
 
-> Consejo: antes de empezar, abre los tres gemelos una vez y pulsa **↺ Reiniciar** en cada uno. Activa el **modo presentación** (`P`) para que los KPIs se vean más grandes al compartir pantalla.
+> Consejo: antes de empezar, abre los dos gemelos una vez y pulsa **↺ Reiniciar** en cada uno. Activa el **modo presentación** (`P`) para que los KPIs y la franja «Qué está pasando» se vean más grandes al compartir pantalla. Durante la demo, si te pierdes, lee esa franja: siempre dice qué mirar.
 
 **0:00–2:00 · Menú: qué es un gemelo digital**
-- Enseña las tres tarjetas. *«Un gemelo digital no es una maqueta 3D: es un modelo que se comporta como la planta, con sus tiempos, averías, colas, costes y energía. Hoy veremos tres pymes tipo.»*
+- Enseña las dos tarjetas. *«Un gemelo digital no es una maqueta 3D: es un modelo que se comporta como la planta, con sus tiempos, averías, colas y costes. Hoy veremos dos pymes tipo.»*
 - Señala el indicador **Datos simulados**. *«Todo es simulado y reproducible: misma semilla, mismo resultado.»*
 
-**2:00–8:00 · Mecanizado**
-1. Abre **Mecanizado** a ×5. Señala las colas delante del torno, el carro que lleva las piezas y los KPIs (OEE, coste por pieza). Haz clic en el **Torno CNC** para enseñar su ficha.
-2. *Calibración* (pestaña **Planta y calibración**): *«Un gemelo recién hecho es optimista: usa los tiempos de catálogo.»* Pulsa **Calibrar** y comenta cómo la curva verde pasa de ir muy por encima a seguir a la negra. *«Sin calibrar, el gemelo engaña. Calibrado con datos reales, es una herramienta para decidir.»*
-3. *Layout*: pulsa **En línea**. Los equipos se mueven y el recorrido baja de 117 m a 32 m. *«Antes de mover una sola máquina, ya sabemos cuánto recorrido nos ahorramos.»*
-4. *Crisis*: **Avería del torno**. Enseña el torno en rojo y la curva de resiliencia. *«El gemelo nos dice cuánto perdemos si no hacemos nada y cuánto salvamos con el plan ensayado.»* Pulsa **Aplicar plan ensayado** y enseña cómo se enciende el torno alternativo.
+**2:00–11:00 · Mecanizado**
+1. Abre **Mecanizado** a ×5. Señala las colas delante del torno, el carro que lleva las piezas y los KPIs (OEE, coste por pieza). La franja de abajo dice que *el torno marca el ritmo*: haz clic en el **Torno CNC** para enseñar su ficha.
+2. *Calibración* (pestaña **Planta y calibración**): *«Un gemelo recién hecho es optimista: usa los tiempos de catálogo.»* Pulsa **Calibrar** y comenta cómo la curva verde pasa de ir muy por encima a seguir a la negra.
+3. *Layout*: pulsa **En línea**. Los equipos se mueven y el recorrido baja de 117 m a 32 m. Vuelve a **Funcional**.
+4. *Crisis del proveedor* (la más visual): pulsa **El proveedor no entrega**. En la curva, enseña la caída a cero sin plan y la zona sombreada con plan. Cierra la ventana, pon ×20 y mira la franja: *«quedan 25… 12… 0 piezas»*; el almacén se pone naranja, la gráfica de producción cae a cero en naranja y los pedidos se acumulan. Pulsa **Aplicar plan ensayado**: la franja cuenta cómo se gasta el stock de seguridad. *«El plan no hace milagros: retrasa la parada y reduce la pérdida. Eso es lo que hay que saber antes de que pase.»*
 5. *¿Qué pasa si…?*: **Comparar los tres escenarios**. *«Crece la demanda. Un segundo turno sirve, pero encarece la pieza. Una célula nueva cuesta más de entrada, pero baja el coste por pieza.»* Señala el mensaje inferior: **el gemelo no decide, muestra las consecuencias**.
 
-**8:00–13:00 · Almacén**
+**11:00–18:00 · Almacén**
 1. Abre **Almacén** a ×5. Enseña los AGV, sus colores y sus baterías, y los palés que esperan en recepción y expedición.
-2. Pestaña **Flota de AGV**: *«¿Cuántos AGV necesito?»* Explica la gráfica: el servicio se dispara hasta 6 AGV y a partir de ahí el coste por pedido sube sin mejorar el servicio. Mueve el deslizador a 4 y verás cómo crecen las colas de pedidos en expedición.
-3. Vuelve a 5 y lanza **Avería de AGV** o **Pico de demanda** (mejor a media mañana, cuando hay más pedidos). Aplica el plan: aparecen las carretillas manuales de apoyo (naranjas).
+2. Pestaña **Flota de AGV**: *«¿Cuántos AGV necesito?»* El servicio se dispara hasta 6 AGV y a partir de ahí el coste por pedido sube sin mejorar el servicio. Mueve el deslizador a 4 y mira crecer la cola de expedición; vuelve a 5.
+3. Lanza **Avería de AGV**: tres AGV se ponen en rojo con su anillo naranja y la franja explica que el resto no da abasto. Aplica el plan: aparecen dos carretillas manuales (naranjas) y la cola deja de crecer.
 4. Comparador: *«Comprar 2 AGV frente a reorganizar el almacén. Comprar da el mejor servicio; reorganizar se queda cerca y con el menor coste por pedido, sin inversión.»*
-
-**13:00–18:00 · Alimentación: energía y sostenibilidad**
-1. Abre **Alimentación** a ×5. Señala los **halos naranjas**: *«el tamaño del halo es lo que consume cada equipo»*. El horno es el gran consumidor.
-2. Pestaña **Energía**: la gráfica apilada por equipo, los €/h y los kg de CO₂/h.
-3. Pulsa **B · Eléctrico**: el halo del horno encoge. Luego **Comparar A y B**: *«En coste y en plazo son parecidas (barras en verde suave), pero B consume un 44 % menos de energía y emite un 63 % menos. Con el gemelo, esa decisión se toma con datos.»*
-4. Crisis **Sube el precio de la energía**: *«Sin plan, la empresa recorta producción en las horas caras. Con un plan ensayado, mantiene la producción y desplaza el frío a horas valle.»*
 
 **18:00–20:00 · Cierre**
 - (Opcional) Pulsa **Datos simulados** para activar los datos públicos (precio PVPC de hoy y temperatura real) si hay internet. *«El gemelo puede conectarse a datos reales; si la red falla, sigue funcionando.»*
@@ -297,7 +284,7 @@ En la opción B la app funciona tanto si nginx conserva el prefijo (`proxy_pass 
 | Ruta | Qué es | Sesión |
 |---|---|---|
 | `/` | Menú principal | Sí |
-| `/mecanizado`, `/almacen`, `/alimentacion` | Gemelos (la app las sirve aunque se entre directamente o se recargue la página) | Sí |
+| `/mecanizado`, `/almacen` | Gemelos (la app las sirve aunque se entre directamente o se recargue la página) | Sí |
 | `/acceso` (GET y POST) | Pantalla y formulario de contraseña | No |
 | `/salir` | Cerrar sesión | No |
 | `/assets/…`, `/favicon.svg` | Ficheros JS/CSS compilados e icono | Sí (el icono, no) |
@@ -421,7 +408,7 @@ En VR apareces en el borde de la planta. Las etiquetas flotantes no se muestran 
 
 - Son **modelos de demostración**: los parámetros son genéricos y verosímiles, pero no proceden de ninguna empresa. No deben usarse para decisiones reales sin calibrarlos.
 - Los AGV no gestionan colisiones ni bloqueos entre sí (pueden cruzarse en un pasillo).
-- La curva de resiliencia se calcula sobre un horizonte fijo (6 h, o 10 h en alimentación) y se suaviza para dibujarla; los totales usan los datos sin suavizar.
+- La curva de resiliencia se calcula sobre un horizonte fijo de 6 h y se suaviza para dibujarla; los totales usan los datos sin suavizar.
 - Durante el cálculo del comparador (unas décimas de segundo) o de la gráfica de flota del almacén (≈ 0,7 s la primera vez) la simulación en vivo se detiene un instante.
 - Versión con servidor: todos los espectadores conectados a un mismo gemelo ven y controlan la misma instancia. En GitHub Pages cada visitante tiene la suya y no hay contraseña.
 - VR: probado solo el arranque del botón; la experiencia en las Quest depende del contexto seguro descrito arriba.
