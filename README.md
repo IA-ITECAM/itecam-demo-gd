@@ -29,6 +29,7 @@ La configuración se lee de un fichero **`.env`** junto a `docker-compose.yml` (
 | `DATOS_PUBLICOS` | `0` | Con `1`, al arrancar intenta descargar el precio eléctrico (REData) y la temperatura (Open-Meteo). Si falla, usa los datos simulados. |
 | `SEMILLA` | `2026` | Semilla de la simulación. Con la misma semilla, la demo es idéntica. |
 | `PUERTO_LOCAL` | `8080` | Puerto del equipo en el que se publica la demo, **solo en 127.0.0.1**. |
+| `BASE_PATH` | *(vacío)* | Prefijo si un proxy (nginx) publica la app en una ruta, p. ej. `/gemelos` → `https://tudominio.es/gemelos/`. Vacío = raíz de su propio dominio o subdominio. |
 | `MAX_CONEXIONES` / `MAX_CONEXIONES_IP` | `60` / `15` | Conexiones de tiempo real simultáneas en total y por IP. |
 
 ### Sin Docker (desarrollo)
@@ -215,6 +216,7 @@ itecam-demo-gd/
 ├─ server/src/                      # Express + ws, un proceso, puerto 8080
 ├─ web/src/                         # Vite + TypeScript + Three.js + Chart.js
 │  ├─ kit/scene-kit.ts  cámara, luces, selección, etiquetas, balizas, halos, instancing, WebXR
+│  ├─ base.ts           prefijo de publicación (BASE_PATH, vía <base href>)
 │  └─ ui/               comparador, curva de resiliencia, gráficas
 └─ tests/                           # Vitest: semilla, KPIs, reproducibilidad, escenarios, datos
 ```
@@ -272,6 +274,52 @@ La primera debe devolver una redirección (`302`) a `/acceso` y la segunda `401`
 ### Alternativa: servicio «Application» con Dockerfile
 
 *Create Service → Application*, *Build Type*: **Dockerfile**, las mismas variables en **Environment** y, en **Domains**, el puerto `8080` con HTTPS. Las opciones de endurecimiento del compose (`read_only`, `cap_drop`, límites de memoria y CPU) no se aplican en este modo; configura los límites de recursos en la pestaña *Advanced* de Dokploy.
+
+### Con nginx propio delante
+
+La configuración de referencia, probada con nginx 1.24 y 1.27, está en [`deploy/nginx-gemelos.conf`](deploy/nginx-gemelos.conf). Tiene dos opciones:
+
+| Opción | URL pública | `BASE_PATH` en el `.env` | nginx |
+|---|---|---|---|
+| **A · Subdominio propio** (recomendada) | `https://gemelos.tudominio.es/` | *(vacío)* | `location / { proxy_pass http://127.0.0.1:8080; … }` |
+| **B · Ruta en un dominio existente** | `https://tudominio.es/gemelos/` | `/gemelos` | `location /gemelos/ { proxy_pass http://127.0.0.1:8080; … }` |
+
+En la opción B la app funciona tanto si nginx conserva el prefijo (`proxy_pass http://127.0.0.1:8080;`) como si lo quita (`proxy_pass http://127.0.0.1:8080/;`).
+
+**Rutas que usa la app** (en la opción B, todas llevan delante `/gemelos`). Todas deben llegar a la app; con un único `location` que lo envíe todo basta:
+
+| Ruta | Qué es | Sesión |
+|---|---|---|
+| `/` | Menú principal | Sí |
+| `/mecanizado`, `/almacen`, `/alimentacion` | Gemelos (la app las sirve aunque se entre directamente o se recargue la página) | Sí |
+| `/acceso` (GET y POST) | Pantalla y formulario de contraseña | No |
+| `/salir` | Cerrar sesión | No |
+| `/assets/…`, `/favicon.svg` | Ficheros JS/CSS compilados e icono | Sí (el icono, no) |
+| `/api/sesion`, `/api/datos`, `/api/gemelos` | API interna | Sí |
+| `/api/health` | Comprobación de salud (`{"ok":true}`), también en la raíz | No |
+| `/ws?gemelo=…` | **WebSocket** de tiempo real | Sí |
+
+Imprescindible en nginx (ya está en el fichero de ejemplo):
+
+- **WebSocket**: `proxy_http_version 1.1` y las cabeceras `Upgrade` y `Connection` (con el `map` del principio del fichero), y `proxy_read_timeout` largo. Sin esto, la escena 3D se queda congelada y el indicador de conexión se pone en rojo.
+- **`Host $http_host`, `X-Forwarded-Host` y `X-Forwarded-Proto $scheme`**: la app los usa para validar el origen del WebSocket y del formulario, y para marcar la cookie como `Secure` bajo HTTPS.
+- **`X-Forwarded-For $remote_addr`**: la IP real del visitante, para el bloqueo de intentos de contraseña. La app solo se fía de esta cabecera cuando la petición llega desde la propia máquina o una red privada (el nginx).
+- **HTTPS** con certificado (por ejemplo `sudo certbot --nginx -d gemelos.tudominio.es`).
+
+Comprobaciones tras configurar nginx (cambia la URL):
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}
+" https://gemelos.tudominio.es/
+```
+
+```bash
+curl -s https://gemelos.tudominio.es/api/health
+```
+
+La primera debe redirigir (`302`) a `/acceso` y la segunda devolver `{"ok":true}`. Después, entra con la contraseña y comprueba que el reloj de un gemelo avanza; eso confirma que el WebSocket atraviesa nginx.
+
+> **Dokploy y nginx a la vez:** Dokploy ya trae su propio proxy (Traefik) en los puertos 80 y 443. Si usas Dokploy, lo más sencillo es su pestaña *Domains* (sección anterior) sin nginx. Si prefieres nginx, no configures dominio en Dokploy: nginx enviará el tráfico a `127.0.0.1:8080`, que es donde el compose publica la app. Y nginx y Traefik no pueden ocupar los dos los puertos 80 y 443.
 
 ### Recomendaciones para el VPS (fuera de esta app)
 

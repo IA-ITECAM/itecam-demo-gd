@@ -38,6 +38,19 @@ export function leerConfig(env: NodeJS.ProcessEnv = process.env): ConfigSegurida
   };
 }
 
+// ---------------- Prefijo de publicación ----------------
+
+/**
+ * Normaliza BASE_PATH: "" o "/" → "/"; "gemelos", "/gemelos" o "/gemelos/" → "/gemelos/".
+ * Devuelve null si contiene caracteres no permitidos.
+ */
+export function normalizarBase(v: string | undefined): string | null {
+  const limpio = (v ?? '').trim().replace(/^\/+|\/+$/g, '');
+  if (!limpio) return '/';
+  if (!/^[a-z0-9._~-]+(\/[a-z0-9._~-]+)*$/i.test(limpio) || limpio.split('/').some((s) => s === '.' || s === '..')) return null;
+  return `/${limpio}/`;
+}
+
 // ---------------- Contraseña y sesiones ----------------
 
 const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest();
@@ -92,12 +105,12 @@ export function leerCookies(cabecera: string | undefined): Record<string, string
   return out;
 }
 
-export function cookieSesion(token: string, maxAgeS: number, segura: boolean): string {
-  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeS)}${segura ? '; Secure' : ''}`;
+export function cookieSesion(token: string, maxAgeS: number, segura: boolean, path = '/'): string {
+  return `${COOKIE}=${token}; Path=${path}; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeS)}${segura ? '; Secure' : ''}`;
 }
 
-export function cookieBorrar(segura: boolean): string {
-  return `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${segura ? '; Secure' : ''}`;
+export function cookieBorrar(segura: boolean, path = '/'): string {
+  return `${COOKIE}=; Path=${path}; HttpOnly; SameSite=Strict; Max-Age=0${segura ? '; Secure' : ''}`;
 }
 
 /** Solo se permite volver a rutas internas sencillas (evita redirecciones abiertas). */
@@ -148,7 +161,8 @@ const CSP = [
   "font-src 'self'",
   "connect-src 'self'",
   "object-src 'none'",
-  "base-uri 'none'",
+  // 'self' (no 'none'): index.html usa <base href> para funcionar bajo un prefijo
+  "base-uri 'self'",
   "frame-ancestors 'none'",
   "form-action 'self'",
 ].join('; ');
@@ -188,9 +202,12 @@ export function ipCliente(req: IncomingMessage): string {
 export function origenPermitido(req: IncomingMessage): boolean {
   const origen = req.headers.origin;
   if (!origen) return true; // clientes que no son navegadores: siguen necesitando la sesión
-  // Algunos navegadores envían «Origin: null» por privacidad; Sec-Fetch-Site lo pone el
-  // navegador y ninguna página puede falsificarlo.
-  if (origen === 'null') return req.headers['sec-fetch-site'] === 'same-origin';
+  // Sec-Fetch-Site lo pone el propio navegador y ninguna página puede falsificarlo. Si dice
+  // "same-origin" la petición viene de esta web aunque un proxy haya cambiado la cabecera Host.
+  const sitio = req.headers['sec-fetch-site'];
+  if (sitio === 'same-origin') return true;
+  if (sitio === 'cross-site' || sitio === 'same-site') return false;
+  if (origen === 'null') return false;
   let host: string;
   try {
     host = new URL(origen).host.toLowerCase();
@@ -271,12 +288,13 @@ export class CuboFichas {
 
 const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-export function paginaAcceso(opts: { error?: string; volver?: string } = {}): string {
+export function paginaAcceso(opts: { error?: string; volver?: string; base?: string } = {}): string {
   const volver = destinoSeguro(opts.volver);
+  const base = escHtml(opts.base ?? '/');
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow"/>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+<link rel="icon" href="${base}favicon.svg" type="image/svg+xml"/>
 <title>Acceso · Gemelos digitales</title>
 <style>
   :root { --fondo:#F5F3EE; --tinta:#0E1A2B; --teal:#0B7373; --naranja:#E8731A; --linea:#e1dccf; }
@@ -296,7 +314,7 @@ export function paginaAcceso(opts: { error?: string; volver?: string } = {}): st
   .err { background:#fbe7d6; color:#7a3a07; border-left:5px solid var(--naranja); padding:10px 12px; border-radius:10px; font-weight:600; }
 </style></head>
 <body>
-  <form method="post" action="/acceso" autocomplete="on">
+  <form method="post" action="${base}acceso" autocomplete="on">
     <div class="k">Industria 5.0</div>
     <h1>Gemelos digitales</h1>
     <p>Introduce la contraseña de acceso a la demo.</p>

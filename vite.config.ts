@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   root: resolve(__dirname, 'web'),
+  // Rutas relativas: el mismo build funciona en la raíz del dominio o bajo un prefijo (BASE_PATH)
+  base: './',
   publicDir: resolve(__dirname, 'web/public'),
   build: {
     outDir: resolve(__dirname, 'dist/public'),

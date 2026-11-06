@@ -14,6 +14,7 @@ import {
   ipCliente,
   paginaAcceso,
   cookieSesion,
+  normalizarBase,
 } from '../server/src/seguridad';
 import { TwinRunner } from '../core/engine';
 import { MODELS } from '../twins/registry.gen';
@@ -74,6 +75,29 @@ describe('Contraseña y sesiones', () => {
   });
 });
 
+describe('Prefijo de publicación (BASE_PATH)', () => {
+  it('normaliza las formas habituales', () => {
+    expect(normalizarBase(undefined)).toBe('/');
+    expect(normalizarBase('')).toBe('/');
+    expect(normalizarBase('/')).toBe('/');
+    expect(normalizarBase('gemelos')).toBe('/gemelos/');
+    expect(normalizarBase('/gemelos')).toBe('/gemelos/');
+    expect(normalizarBase('/gemelos/')).toBe('/gemelos/');
+    expect(normalizarBase('/demos/gemelos-digitales/')).toBe('/demos/gemelos-digitales/');
+  });
+  it('rechaza prefijos peligrosos o inválidos', () => {
+    for (const malo of ['/../etc', '/a/../b', '/a b', '/"><script>', '//evil.com/x', '/a?b', '/a#b', '/./x']) {
+      const r = normalizarBase(malo);
+      expect(r === null || (!r.includes('..') && !r.includes('"') && !r.includes('//') && r !== '/'), malo).toBe(true);
+    }
+    expect(normalizarBase('/../etc')).toBeNull();
+    expect(normalizarBase('/"><script>')).toBeNull();
+  });
+  it('la cookie puede limitarse al prefijo', () => {
+    expect(cookieSesion('t', 60, true, '/gemelos')).toContain('Path=/gemelos;');
+  });
+});
+
 describe('Redirecciones, origen e IP', () => {
   it('solo redirige a rutas internas', () => {
     expect(destinoSeguro('/mecanizado')).toBe('/mecanizado');
@@ -90,6 +114,11 @@ describe('Redirecciones, origen e IP', () => {
     expect(origenPermitido(req({ host: 'demo.ejemplo.es', origin: 'null', 'sec-fetch-site': 'same-origin' }))).toBe(true);
     expect(origenPermitido(req({ host: 'demo.ejemplo.es', origin: 'null', 'sec-fetch-site': 'cross-site' }))).toBe(false);
     expect(origenPermitido(req({ host: 'interno:8080', 'x-forwarded-host': 'demo.ejemplo.es', origin: 'https://demo.ejemplo.es' }))).toBe(true);
+    // nginx que no reenvía Host: el navegador garantiza con Sec-Fetch-Site que es la misma web
+    expect(origenPermitido(req({ host: '127.0.0.1:8080', origin: 'https://demo.ejemplo.es', 'sec-fetch-site': 'same-origin' }))).toBe(true);
+    // una web ajena nunca pasa, aunque coincida el Host
+    expect(origenPermitido(req({ host: 'demo.ejemplo.es', origin: 'https://demo.ejemplo.es', 'sec-fetch-site': 'cross-site' }))).toBe(false);
+    expect(origenPermitido(req({ host: 'demo.ejemplo.es', origin: 'https://otra.ejemplo.es', 'sec-fetch-site': 'same-site' }))).toBe(false);
   });
 
   it('solo se fía de X-Forwarded-For si viene del proxy (red privada)', () => {

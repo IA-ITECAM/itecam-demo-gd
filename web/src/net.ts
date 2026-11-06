@@ -1,13 +1,14 @@
 /** Cliente WebSocket con reconexión automática. */
+import { url, rutaActual } from './base';
 
 export function irAlAcceso() {
-  location.href = `/acceso?volver=${encodeURIComponent(location.pathname)}`;
+  location.href = `${url('acceso')}?volver=${encodeURIComponent(rutaActual())}`;
 }
 
 /** Si la API responde 401, la sesión ha caducado. */
 export async function comprobarSesion() {
   try {
-    const r = await fetch('/api/sesion', { cache: 'no-store', credentials: 'same-origin' });
+    const r = await fetch(url('api/sesion'), { cache: 'no-store', credentials: 'same-origin' });
     if (r.status === 401) irAlAcceso();
   } catch {
     /* sin red: se seguirá reintentando */
@@ -28,7 +29,7 @@ export class TwinSocket {
 
   private connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${location.host}/ws?gemelo=${encodeURIComponent(this.gemelo)}`);
+    const ws = new WebSocket(`${proto}://${location.host}${url('ws')}?gemelo=${encodeURIComponent(this.gemelo)}`);
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;

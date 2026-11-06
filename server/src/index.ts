@@ -5,7 +5,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { createServer, type IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { MODELS } from '../../twins/registry.gen';
@@ -29,6 +29,7 @@ import {
   COMANDOS_PESADOS,
   CuboFichas,
   paginaAcceso,
+  normalizarBase,
   COOKIE,
 } from './seguridad';
 
@@ -37,6 +38,15 @@ const SEED = Number(process.env.SEMILLA ?? 2026);
 const PUBLIC_DIR = process.env.PUBLIC_DIR ?? resolve(process.cwd(), 'dist/public');
 const FPS = 10;
 const SEG = leerConfig();
+const BASE_NORMAL = normalizarBase(process.env.BASE_PATH);
+if (!BASE_NORMAL) {
+  console.error(`BASE_PATH no válido: "${process.env.BASE_PATH}". Usa algo como /gemelos`);
+  process.exit(1);
+}
+/** Prefijo público de la app: "/" o "/gemelos/" */
+const BASE: string = BASE_NORMAL;
+/** Path de la cookie: "/gemelos" vale para /gemelos y /gemelos/… (y no para otras apps del dominio) */
+const COOKIE_PATH = BASE === '/' ? '/' : BASE.slice(0, -1);
 const CON_CLAVE = SEG.clave.length > 0;
 
 // ---------- Gemelos ----------
@@ -74,86 +84,115 @@ const intentos = new LimitadorIntentos();
 setInterval(() => intentos.limpiar(), 10 * 60_000).unref();
 
 // ---------- HTTP ----------
+/** Ruta absoluta pública dentro de la app: enlace('acceso') → "/gemelos/acceso". */
+const enlace = (p: string) => BASE + p.replace(/^\/+/, '');
+/** Ruta interna validada ("/mecanizado") → URL pública con prefijo. */
+const aRuta = (ruta: string) => enlace(destinoSeguro(ruta));
+
 const app = express();
 app.disable('x-powered-by');
-// Solo se confía en X-Forwarded-* si la petición llega desde una red privada (proxy de Dokploy/Traefik).
+// Solo se confía en X-Forwarded-* si la petición llega desde una red privada o local (nginx, Traefik).
 app.set('trust proxy', process.env.CONFIAR_PROXY ?? 'loopback, linklocal, uniquelocal');
 app.use(cabecerasSeguridad);
 
+// Comprobación de salud del contenedor: siempre en la raíz, sin sesión.
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
-app.get('/favicon.svg', (_req, res, next) => {
+
+// index.html con <base href> = BASE_PATH: así los assets y el router funcionan bajo cualquier prefijo
+const INDEX_HTML = (() => {
+  const f = join(PUBLIC_DIR, 'index.html');
+  if (!existsSync(f)) return null;
+  const html = readFileSync(f, 'utf8');
+  const base = `<base href="${BASE}" />`;
+  return /<base\s[^>]*>/i.test(html) ? html.replace(/<base\s[^>]*>/i, base) : html.replace(/<head>/i, `<head>\n    ${base}`);
+})();
+
+const r = express.Router();
+
+r.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+r.get('/favicon.svg', (_req, res, next) => {
   const f = join(PUBLIC_DIR, 'favicon.svg');
   if (existsSync(f)) res.sendFile(f);
   else next();
 });
 
-app.get('/acceso', (req, res) => {
+r.get('/acceso', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  if (sesionValida(req)) return res.redirect(303, destinoSeguro(req.query.volver));
-  res.type('html').send(paginaAcceso({ volver: String(req.query.volver ?? '/') }));
+  if (sesionValida(req)) return res.redirect(303, aRuta(String(req.query.volver ?? '/')));
+  res.type('html').send(paginaAcceso({ volver: String(req.query.volver ?? '/'), base: BASE }));
 });
 
-app.post('/acceso', express.urlencoded({ extended: false, limit: '2kb', parameterLimit: 5 }), async (req, res) => {
+r.post('/acceso', express.urlencoded({ extended: false, limit: '2kb', parameterLimit: 5 }), async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const volver = destinoSeguro(req.body?.volver);
-  if (!CON_CLAVE) return res.redirect(303, volver);
-  if (!origenPermitido(req)) return res.status(403).type('html').send(paginaAcceso({ error: 'Origen no permitido.', volver }));
+  if (!CON_CLAVE) return res.redirect(303, aRuta(volver));
+  if (!origenPermitido(req)) return res.status(403).type('html').send(paginaAcceso({ error: 'Origen no permitido.', volver, base: BASE }));
   const ip = req.ip ?? 'desconocida';
   const espera = intentos.bloqueado(ip);
   if (espera > 0) {
     const min = Math.ceil(espera / 60_000);
-    return res.status(429).type('html').send(paginaAcceso({ error: `Demasiados intentos. Vuelve a probar dentro de ${min} min.`, volver }));
+    return res.status(429).type('html').send(paginaAcceso({ error: `Demasiados intentos. Vuelve a probar dentro de ${min} min.`, volver, base: BASE }));
   }
   if (claveCorrecta(req.body?.clave, SEG.clave)) {
     intentos.exito(ip);
     const maxAge = SEG.sesionHoras * 3600;
-    res.setHeader('Set-Cookie', cookieSesion(crearToken(SEG.claveFirma, Date.now() + maxAge * 1000), maxAge, req.secure));
-    return res.redirect(303, volver);
+    res.setHeader('Set-Cookie', cookieSesion(crearToken(SEG.claveFirma, Date.now() + maxAge * 1000), maxAge, req.secure, COOKIE_PATH));
+    return res.redirect(303, aRuta(volver));
   }
   intentos.fallo(ip);
   console.warn(`[acceso] contraseña incorrecta desde ${ip}`);
-  await new Promise((r) => setTimeout(r, 600)); // frena los ataques de fuerza bruta
-  res.status(401).type('html').send(paginaAcceso({ error: 'Contraseña incorrecta.', volver }));
+  await new Promise((res2) => setTimeout(res2, 600)); // frena los ataques de fuerza bruta
+  res.status(401).type('html').send(paginaAcceso({ error: 'Contraseña incorrecta.', volver, base: BASE }));
 });
 
-app.get('/salir', (req, res) => {
-  res.setHeader('Set-Cookie', cookieBorrar(req.secure));
-  res.redirect(303, CON_CLAVE ? '/acceso' : '/');
+r.get('/salir', (req, res) => {
+  res.setHeader('Set-Cookie', cookieBorrar(req.secure, COOKIE_PATH));
+  res.redirect(303, CON_CLAVE ? enlace('acceso') : BASE);
 });
 
 // A partir de aquí todo exige sesión (si hay contraseña configurada)
-app.use((req: Request, res: Response, next: NextFunction) => {
+r.use((req: Request, res: Response, next: NextFunction) => {
   if (sesionValida(req)) return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Sesión necesaria' });
   if (req.method === 'GET' && req.accepts('html')) {
-    return res.redirect(302, `/acceso?volver=${encodeURIComponent(destinoSeguro(req.path))}`);
+    return res.redirect(302, `${enlace('acceso')}?volver=${encodeURIComponent(destinoSeguro(req.path))}`);
   }
   res.status(401).end();
 });
 
-app.get('/api/sesion', (_req, res) => {
+r.get('/api/sesion', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ autenticacion: CON_CLAVE });
 });
-app.get('/api/gemelos', (_req, res) => {
+r.get('/api/gemelos', (_req, res) => {
   res.json(MODELS.map((m) => m.config).sort((a, b) => a.orden - b.orden));
 });
-app.get('/api/datos', (_req, res) => {
+r.get('/api/datos', (_req, res) => {
   res.json(infoDatos());
 });
 
-if (existsSync(PUBLIC_DIR)) {
-  app.use(express.static(PUBLIC_DIR, { index: false, maxAge: '1h', dotfiles: 'ignore' }));
-  const indexHtml = join(PUBLIC_DIR, 'index.html');
+if (INDEX_HTML) {
+  // index.html siempre con el <base> inyectado, nunca el fichero tal cual
+  r.get('/index.html', (_req, res) => res.redirect(301, BASE));
+  r.use(express.static(PUBLIC_DIR, { index: false, maxAge: '1h', dotfiles: 'ignore' }));
   // Rutas de la SPA: "/", "/mecanizado", "/almacen", "/alimentacion"…
-  app.get(/^\/(?!api\/|ws)[a-z0-9\-]*$/i, (_req, res) => res.sendFile(indexHtml, { headers: { 'Cache-Control': 'no-store' } }));
+  r.get(/^\/(?!api\/|ws)[a-z0-9\-]*$/i, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(INDEX_HTML);
+  });
 } else {
-  app.get('/', (_req, res) => {
+  r.get('/', (_req, res) => {
     res.type('text').send('Frontend no compilado. Ejecuta "npm run build" o usa "npm run dev:web".');
   });
 }
+
+// La app responde con el prefijo (nginx lo conserva) y también sin él (nginx lo quita).
+if (BASE !== '/') app.use(BASE.slice(0, -1), r);
+app.use('/', r);
 app.use((_req, res) => res.status(404).type('text').send('No encontrado'));
 // Errores: nunca se devuelven detalles internos al navegador
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
@@ -181,7 +220,8 @@ function rechazar(socket: Duplex, codigo: number, texto: string) {
 server.on('upgrade', (req, socket, head) => {
   socket.on('error', () => socket.destroy());
   const url = new URL(req.url ?? '/', 'http://localhost');
-  if (url.pathname !== '/ws') return rechazar(socket, 404, 'Not Found');
+  // /ws con el prefijo (nginx lo conserva) o sin él (nginx lo quita)
+  if (url.pathname !== `${BASE}ws` && url.pathname !== '/ws') return rechazar(socket, 404, 'Not Found');
   if (!origenPermitido(req)) return rechazar(socket, 403, 'Forbidden');
   if (!sesionValida(req)) return rechazar(socket, 401, 'Unauthorized');
   const id = url.searchParams.get('gemelo') ?? '';
@@ -367,7 +407,8 @@ setInterval(() => {
 }, 1000 / FPS);
 
 server.listen(PORT, () => {
-  console.log(`Gemelos digitales ITECAM en http://localhost:${PORT}  (semilla ${SEED})`);
+  console.log(`Gemelos digitales ITECAM en http://localhost:${PORT}${BASE}  (semilla ${SEED})`);
+  if (BASE !== '/') console.log(`Publicada bajo el prefijo ${BASE}`);
   console.log(`Gemelos: ${[...runners.keys()].join(', ')}`);
   if (CON_CLAVE) {
     console.log(`Acceso protegido con contraseña (sesiones de ${SEG.sesionHoras} h).`);

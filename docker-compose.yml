@@ -15,6 +15,8 @@ services:
       - DATOS_PUBLICOS=${DATOS_PUBLICOS:-0}
       # Semilla de la simulación (misma semilla = misma demo)
       - SEMILLA=${SEMILLA:-2026}
+      # Prefijo si nginx publica la app en una ruta (p. ej. /gemelos). Vacío = raíz del dominio.
+      - BASE_PATH=${BASE_PATH:-}
     # Puerto interno para el proxy de Dokploy (Traefik) a través de la red de Docker.
     expose:
       - "8080"

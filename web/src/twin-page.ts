@@ -5,6 +5,7 @@
 import type { TwinConfig, Equipo, ScenarioId } from '../../core/types';
 import type { Kpis } from '../../core/kpis';
 import { TwinSocket } from './net';
+import { BASE } from './base';
 import { loadScene } from './registry';
 import { SceneKit, COLOR_ESTADO, TEXTO_ESTADO } from './kit/scene-kit';
 import type { TwinApi, TwinSceneHandle } from './kit/types';
@@ -21,7 +22,7 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   const page = el('div', 'twin-page');
   page.innerHTML = `
     <header class="topbar">
-      <a class="btn" href="/" data-link title="Volver al menú">← Menú</a>
+      <a class="btn" href="${BASE}" data-link title="Volver al menú">← Menú</a>
       <div class="tb-title"><b>${esc(cfg.titulo)}</b><span>${esc(cfg.subtitulo)}</span></div>
       <div class="tb-clock">—</div>
       <div class="seg sec" role="group" aria-label="Velocidad">

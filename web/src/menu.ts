@@ -1,5 +1,6 @@
 import { TWINS } from './registry';
 import { el, esc } from './ui/format';
+import { url } from './base';
 
 /** Ilustraciones sencillas (SVG en línea, sin descargas). */
 const ILUSTRACION: Record<string, string> = {
@@ -32,7 +33,7 @@ export function renderMenu(root: HTMLElement) {
         <h1>Gemelos digitales de nueva generación</h1>
         <p class="menu-lead">Tres plantas tipo de pyme simuladas en tiempo real. Provoca crisis, compara escenarios y observa las consecuencias antes de decidir.</p>
       </div>
-      <div class="fila"><span class="pill" id="menu-datos"><i class="dot sim"></i> Datos simulados</span><a class="btn hidden" id="menu-salir" href="/salir">Cerrar sesión</a></div>
+      <div class="fila"><span class="pill" id="menu-datos"><i class="dot sim"></i> Datos simulados</span><a class="btn hidden" id="menu-salir" href="${url('salir')}">Cerrar sesión</a></div>
     </div>
     <div class="menu-cards"></div>
     <div class="menu-foot">
@@ -42,7 +43,7 @@ export function renderMenu(root: HTMLElement) {
   const cards = page.querySelector('.menu-cards')!;
   for (const t of TWINS) {
     const a = el('a', 'tarjeta');
-    a.href = `/${t.id}`;
+    a.href = url(t.id);
     a.dataset.link = '';
     a.innerHTML = `
       <div class="tarjeta-img">${ILUSTRACION[t.id] ?? ''}</div>
@@ -55,13 +56,13 @@ export function renderMenu(root: HTMLElement) {
     cards.appendChild(a);
   }
   root.appendChild(page);
-  fetch('/api/sesion', { cache: 'no-store' })
+  fetch(url('api/sesion'), { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
     .then((s) => {
       if (s?.autenticacion) page.querySelector('#menu-salir')?.classList.remove('hidden');
     })
     .catch(() => {});
-  fetch('/api/datos')
+  fetch(url('api/datos'))
     .then((r) => r.json())
     .then((d) => {
       const p = page.querySelector('#menu-datos');

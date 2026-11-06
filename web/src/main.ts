@@ -2,6 +2,7 @@ import './style.css';
 import { renderMenu } from './menu';
 import { getConfig } from './registry';
 import { renderTwin } from './twin-page';
+import { BASE, rutaActual } from './base';
 
 const root = document.getElementById('app')!;
 let cleanup: (() => void) | null = null;
@@ -10,11 +11,11 @@ function route() {
   cleanup?.();
   cleanup = null;
   root.innerHTML = '';
-  const id = location.pathname.replace(/^\/+|\/+$/g, '');
+  const id = rutaActual().slice(1);
   const cfg = id ? getConfig(id) : undefined;
   if (cfg) cleanup = renderTwin(root, cfg);
   else {
-    if (id) history.replaceState(null, '', '/');
+    if (id) history.replaceState(null, '', BASE);
     cleanup = renderMenu(root);
   }
 }
@@ -29,7 +30,7 @@ document.addEventListener('click', (e) => {
   const a = (e.target as HTMLElement).closest('a[data-link]') as HTMLAnchorElement | null;
   if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
   e.preventDefault();
-  navigate(a.getAttribute('href')!);
+  navigate(a.pathname); // ruta ya resuelta con el prefijo
 });
 window.addEventListener('popstate', route);
 route();
