@@ -1,7 +1,7 @@
 /** Escena 3D y panel propio del gemelo de mecanizado. */
 import { THREE, PALETA, box, cyl, mat, floorText, FloorPath, SmoothPool, smoothTo, defaultSub, type SceneKit } from '../../web/src/kit/scene-kit';
 import type { TwinClient, TwinApi } from '../../web/src/kit/types';
-import { lineChart, setData, C, type Chart } from '../../web/src/ui/charts';
+import { lineChart, setData, seguirTamano, C, type Chart } from '../../web/src/ui/charts';
 import { fmt } from '../../web/src/ui/format';
 import { LAYOUTS, type PuestoId } from './config';
 import type { MecView } from './model';
@@ -194,23 +194,23 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
   const v0: MecView | null = api.lastView();
   body.innerHTML = `
     <div class="card">
-      <h3>Distribución en planta <small>escenario de layout</small></h3>
-      <p>Reordena la célula "en línea" y observa cómo cambia el recorrido de la pieza (trazado verde sobre el suelo).</p>
-      <div class="fila" style="margin-top:8px">
+      <h3>Distribución en planta <small>recorrido de la pieza (trazado verde)</small></h3>
+      <div class="fila" style="justify-content:space-between">
         <div class="seg"><button data-l="funcional">Funcional (actual)</button><button data-l="linea">En línea</button></div>
+        <span class="big-num rec">—</span>
       </div>
-      <div class="fila" style="margin-top:10px;align-items:baseline"><span class="big-num rec">—</span><span class="nota rec-s"></span></div>
+      <div class="nota rec-s una-linea" style="margin-top:4px"></div>
     </div>
-    <div class="card">
-      <h3>Modo calibración <small>producción por hora · 24 h</small></h3>
-      <p>Producción <b>real</b> (histórico con paradas) frente a la del <b>gemelo</b>. Un gemelo sin calibrar es optimista.</p>
-      <div class="chart-box alto"><canvas></canvas></div>
-      <div class="fila" style="margin-top:8px;justify-content:space-between">
+    <div class="card flex">
+      <h3>Modo calibración <small>piezas por hora · 24 h</small></h3>
+      <p class="una-linea"><b style="color:var(--tinta)">━ Real</b> (histórico con paradas) frente al <b style="color:var(--teal)">━ gemelo</b></p>
+      <div class="chart-box"><canvas></canvas></div>
+      <div class="fila" style="margin-top:6px;justify-content:space-between">
         <button class="btn primario b-cal" disabled>⚙ Calibrar</button>
         <span>Error medio: <b class="err">—</b></span>
       </div>
-      <div class="nota paso" style="margin-top:6px">Cargando histórico…</div>
-      <table class="tabla res-cal hidden" style="margin-top:6px"></table>
+      <div class="nota paso una-linea" style="margin-top:4px">Cargando histórico…</div>
+      <div class="nota res-cal una-linea hidden"></div>
     </div>`;
   const recorrido: Record<string, number> = {};
   const pintarLayout = (layout: string) => {
@@ -222,7 +222,7 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
     const f = recorrido.funcional;
     const l = recorrido.linea;
     (body.querySelector('.rec-s') as HTMLElement).textContent =
-      f && l ? `de recorrido por pieza · funcional ${fmt(f, 0)} m → en línea ${fmt(l, 0)} m (−${fmt((1 - l / f) * 100, 0)} %)` : 'de recorrido por pieza';
+      f && l ? `Funcional ${fmt(f, 0)} m → en línea ${fmt(l, 0)} m (−${fmt((1 - l / f) * 100, 0)} %)` : 'Cambia la distribución y mira el recorrido';
   };
   body.querySelectorAll<HTMLButtonElement>('[data-l]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -238,8 +238,9 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
       { label: 'Real (histórico)', data: [], borderColor: C.tinta, borderWidth: 2.5, tension: 0.1 },
       { label: 'Gemelo', data: [], borderColor: C.teal, borderWidth: 3, borderDash: [], backgroundColor: C.tealSuave, fill: false, tension: 0.1 },
     ],
-    { leyenda: true, maxTicksX: 8, xTitulo: 'Hora de operación' },
+    { leyenda: false, maxTicksX: 8 },
   );
+  seguirTamano(chart);
   let calib: any = null;
   let anim: number | null = null;
   const btn = body.querySelector('.b-cal') as HTMLButtonElement;
@@ -266,10 +267,8 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
         btn.disabled = false;
         btn.textContent = '↺ Repetir calibración';
         const r = calib.resumen;
-        tabla.innerHTML = `<tr><th>Parámetro</th><th>Catálogo</th><th>Calibrado</th></tr>
-          <tr><td>Ciclo del torno</td><td>${fmt(r.cicloTorno[0], 0)} s</td><td>${fmt(r.cicloTorno[1], 0)} s</td></tr>
-          <tr><td>Paradas registradas (24 h)</td><td>0</td><td>${r.paradas}</td></tr>
-          <tr><td>MTBF / MTTR del torno</td><td>sin averías</td><td>${r.mtbfTorno} h / ${r.mttrTorno} min</td></tr>`;
+        tabla.innerHTML = `<b>Calibrado:</b> ciclo del torno ${fmt(r.cicloTorno[0], 0)} → ${fmt(r.cicloTorno[1], 0)} s · ${r.paradas} paradas reales · MTBF ${r.mtbfTorno} h / MTTR ${r.mttrTorno} min`;
+        tabla.title = tabla.textContent ?? '';
         tabla.classList.remove('hidden');
       }
     }, 700);

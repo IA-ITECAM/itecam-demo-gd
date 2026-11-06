@@ -256,10 +256,9 @@ body.presentacion .narrativa { font-size: 22px; }
 
 /* ---------------- Modo presentación ---------------- */
 body.presentacion .sec { display: none !important; }
-body.presentacion .side { width: 480px; }
-body.presentacion .kpi-v { font-size: 40px; }
-body.presentacion .kpi-l { font-size: 16px; }
-body.presentacion .kpi-s { font-size: 15px; }
+body.presentacion .side { width: 460px; }
+body.presentacion .kpi-v { font-size: clamp(22px, 3.2vh, 32px); }
+body.presentacion .kpi-l { font-size: 14px; }
 body.presentacion .lbl { font-size: 16px; }
 body.presentacion .tb-clock { font-size: 24px; }
 
@@ -269,3 +268,83 @@ body.presentacion .tb-clock { font-size: 24px; }
   .crisis-banner { max-width: calc(100% - 40px); top: auto; bottom: 60px; }
   .res-grid { grid-template-columns: 1fr; }
 }
+
+/* =====================================================================
+   Compacto: toda la interfaz a la vista, sin scroll vertical.
+   El panel lateral ocupa la altura de la ventana y la pestaña activa se
+   reparte el espacio que queda (sus gráficas se encogen o crecen).
+   ===================================================================== */
+.twin-page { height: 100vh; overflow: hidden; }
+.topbar { padding: 7px 12px; gap: 8px; }
+.topbar .btn, .vr-btn { padding: 6px 11px; font-size: 15px; }
+.seg button { padding: 6px 10px; font-size: 15px; }
+.tb-title b { font-size: 18px; }
+.tb-title span { font-size: 13px; }
+.tb-clock { font-size: 18px; padding: 4px 10px; min-width: 140px; }
+
+.side { width: 430px; overflow: hidden; gap: 8px; padding: 10px; }
+.kpis { grid-template-columns: repeat(3, 1fr); gap: 6px; flex-shrink: 0; }
+.kpi { padding: 6px 9px; border-radius: 10px; gap: 0; min-width: 0; cursor: help; }
+.kpi.ancho { grid-column: span 3; flex-direction: row; align-items: baseline; justify-content: space-between; padding: 4px 9px; }
+.kpi.ancho .kpi-l { font-size: 13px; }
+.kpi.ancho .kpi-v { font-size: 18px; }
+.kpi-l { font-size: 12.5px; gap: 4px; white-space: nowrap; overflow: hidden; }
+.kpi-l span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.kpi-v { font-size: clamp(18px, 2.7vh, 25px); white-space: nowrap; }
+.kpi-v small { font-size: 12px; margin-left: 2px; }
+.kpi-s { display: none; }
+
+.card { padding: 7px 10px 8px; border-radius: 10px; }
+.card h3 { font-size: 14px; margin-bottom: 4px; }
+.card h3 small { font-size: 12px; }
+.card p, .tab-inner p { font-size: 13.5px; line-height: 1.35; }
+.side > .card { flex-shrink: 0; }
+.side > .card .chart-box { height: clamp(70px, 12vh, 120px); }
+
+.tabs { flex-shrink: 0; }
+.tabs button { padding: 6px 9px; font-size: 14.5px; }
+.tab-body { flex: 1; min-height: 0; }
+.tab-inner { flex: 1; min-height: 0; gap: 8px; overflow: hidden; }
+/* tarjetas elásticas dentro de una pestaña: ocupan el espacio libre y su gráfica se adapta */
+.card.flex { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.card.flex .chart-box { flex: 1 1 0; min-height: 70px; height: auto; overflow: hidden; }
+/* el canvas no aporta altura propia: la gráfica ocupa exactamente el hueco libre */
+.card.flex .chart-box canvas { position: absolute; left: 0; top: 0; }
+.nota { font-size: 12.5px; }
+.una-linea { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.crisis-grid { gap: 7px; }
+.crisis-btn { min-height: 0; padding: 8px 10px; border-radius: 11px; gap: 2px; }
+.crisis-btn b { font-size: 14.5px; gap: 6px; }
+.crisis-btn .ico { font-size: 17px; }
+.crisis-btn span { font-size: 12.5px; line-height: 1.3; }
+.tab-inner > .btn { align-self: flex-start; padding: 6px 12px; font-size: 14px; }
+.big-num { font-size: 26px; }
+.campo label { font-size: 14px; }
+input[type='range'] { height: 22px; }
+.pill { font-size: 12.5px; padding: 2px 8px; }
+.esc-lista { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--tinta-2); display: flex; flex-direction: column; gap: 3px; }
+.esc-lista b { color: var(--tinta); }
+
+/* Ventanas (curva y comparador) también sin scroll */
+.modal { padding: 16px; }
+.modal-box { padding: 16px 20px; gap: 12px; }
+.modal-head h2 { font-size: 24px; }
+.modal-head p { font-size: 15px; }
+.res-chart { height: min(400px, 52vh); }
+.res-num { padding: 10px 12px; }
+.res-num .big-num { font-size: 26px; }
+.cmp-col { padding: 12px; gap: 6px; }
+.cmp-col h3 { font-size: 19px; }
+.cmp-col .det { font-size: 13.5px; min-height: 0; }
+.cmp-kpi-l { font-size: 13.5px; }
+.cmp-kpi-v { font-size: 16px; }
+.cmp-bar { height: 9px; }
+.cmp-msg { font-size: 18px; padding: 10px; }
+
+@media (max-height: 720px) {
+  .side > .card { display: none; }
+}
+
+.estados { flex-wrap: nowrap; height: 22px; overflow: hidden; gap: 4px; }
+.estados .pill { padding: 1px 6px; font-size: 12px; gap: 4px; }

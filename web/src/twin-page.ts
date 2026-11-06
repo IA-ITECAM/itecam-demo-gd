@@ -81,9 +81,9 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
     { key: 'ritmo', label: 'Producción', dir: '↑' },
     { key: 'oee', label: 'OEE', dir: '↑' },
     { key: 'coste', label: `Coste por ${cfg.unidad}`, dir: '↓' },
-    { key: 'servicio', label: 'Nivel de servicio', dir: '↑' },
-    { key: 'energia', label: 'Energía consumida', dir: '↓' },
-    { key: 'co2', label: 'Emisiones estimadas', dir: '↓' },
+    { key: 'servicio', label: 'Servicio', dir: '↑' },
+    { key: 'energia', label: 'Energía', dir: '↓' },
+    { key: 'co2', label: 'Emisiones', dir: '↓' },
     { key: 'plazo', label: 'Plazo medio', dir: '↓', ancho: true },
   ];
   const kpiBox = $('.kpis');
@@ -99,6 +99,7 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
     const set = (key: string, v: string, s: string, mal = false) => {
       kpiEls[key].v.innerHTML = v;
       kpiEls[key].s.textContent = s;
+      kpiEls[key].card.title = s;
       kpiEls[key].card.classList.toggle('mal', mal);
     };
     set('ritmo', `${fmt(f.ritmo, 0)}<small>${cfg.unidadPlural}/h</small>`, `${fmt(k.unidades)} ${cfg.unidadPlural} en total · media ${fmt(k.produccionHora, 1)}/h`);
@@ -190,7 +191,7 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   }
 
   function renderCrisisTab(body: HTMLElement) {
-    body.appendChild(el('p', '', 'Provoca una crisis: el gemelo la muestra al instante y calcula qué pasaría <b>sin plan</b> y <b>con un plan ensayado</b>.'));
+    body.appendChild(el('p', '', 'El gemelo la muestra al instante y calcula qué pasaría <b>sin plan</b> y <b>con un plan ensayado</b>.'));
     const grid = el('div', 'crisis-grid');
     for (const c of cfg.crisis) {
       const b = el('button', 'crisis-btn');
@@ -208,14 +209,9 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
 
   function renderEscenariosTab(body: HTMLElement) {
     const c = cfg.comparador;
-    body.innerHTML = `<div class="card"><h3>${esc(c.titulo)}</h3><p>${esc(c.pregunta)}</p></div>`;
-    for (const sc of c.escenarios) {
-      const d = el('div', 'card');
-      d.innerHTML = `<h3>${esc(sc.titulo)}</h3><p>${esc(sc.detalle)}</p>`;
-      body.appendChild(d);
-    }
+    body.innerHTML = `<div class="card"><h3>${esc(c.titulo)}</h3><p>${esc(c.pregunta)}</p>
+      <ul class="esc-lista">${c.escenarios.map((sc) => `<li><b>${esc(sc.titulo)}</b>: ${esc(sc.detalle)}</li>`).join('')}</ul></div>`;
     const run = el('button', 'btn primario', '▶ Comparar los tres escenarios');
-    run.style.alignSelf = 'flex-start';
     run.addEventListener('click', () => {
       cmpModal.loading();
       socket.send('comparar');

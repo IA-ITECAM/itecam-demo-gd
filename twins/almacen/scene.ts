@@ -1,7 +1,7 @@
 /** Escena 3D y panel propio del gemelo de almacén. */
 import { THREE, PALETA, box, cyl, mat, floorText, floorZone, FloorPath, SmoothPool, type SceneKit } from '../../web/src/kit/scene-kit';
 import type { TwinClient, TwinApi } from '../../web/src/kit/types';
-import { Chart, C } from '../../web/src/ui/charts';
+import { Chart, C, seguirTamano } from '../../web/src/ui/charts';
 import { fmt } from '../../web/src/ui/format';
 import { NAVE, FILAS_Z, BLOQUES_X, PASILLOS_Z, TRANSVERSALES_X, MUELLES_RECEPCION, MUELLES_EXPEDICION, CARGADORES, RESERVA } from './config';
 import type { AlmView } from './model';
@@ -196,19 +196,18 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
   const flota = v?.flota ?? 5;
   body.innerHTML = `
     <div class="card">
-      <h3>¿Cuántos AGV necesito? <small>tamaño de la flota en vivo</small></h3>
+      <h3>¿Cuántos AGV necesito? <small>flota en vivo</small></h3>
       <div class="campo">
-        <label><span>AGV en la flota</span><span class="big-num nf" style="font-size:28px">${flota}</span></label>
+        <label><span>AGV en la flota</span><span class="big-num nf">${flota}</span></label>
         <input type="range" min="2" max="14" step="1" value="${flota}" />
       </div>
-      <div class="fila estados" style="margin-top:6px"></div>
+      <div class="fila estados" style="margin-top:4px"></div>
     </div>
-    <div class="card">
-      <h3>Nivel de servicio y coste según la flota <small>1 día simulado por punto</small></h3>
-      <div class="chart-box alto"><canvas></canvas></div>
-      <p class="nota" style="margin-top:6px">Cada punto es un día completo (2 turnos, con picos) simulado con la misma semilla. El punto naranja es la flota actual.</p>
-    </div>
-    <div class="info">Pista: pasa de 4 a 5 y a 7 AGV. A partir de cierto tamaño, el servicio ya no mejora y el coste por pedido sube.</div>`;
+    <div class="card flex">
+      <h3>Servicio y coste según la flota <small><b style="color:var(--teal)">━ servicio %</b> · <b style="color:var(--tinta)">┅ €/pedido</b></small></h3>
+      <div class="chart-box"><canvas></canvas></div>
+      <p class="nota una-linea" style="margin-top:4px" title="Cada punto es un día completo (2 turnos, con picos) simulado con la misma semilla.">Punto naranja = flota actual. A partir de 6 AGV el servicio ya no mejora y el coste sube.</p>
+    </div>`;
   const range = body.querySelector('input')!;
   const nf = body.querySelector('.nf') as HTMLElement;
   range.addEventListener('input', () => (nf.textContent = range.value));
@@ -226,14 +225,15 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
     },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 14 } } },
+      plugins: { legend: { display: false } },
       scales: {
-        x: { title: { display: true, text: 'AGV en la flota' }, grid: { color: C.tinta + '14' } },
-        y: { min: 0, max: 100, position: 'left', title: { display: true, text: 'Servicio %' }, grid: { color: C.tinta + '14' } },
-        y1: { min: 0, position: 'right', title: { display: true, text: '€/pedido' }, grid: { display: false } },
+        x: { title: { display: true, text: 'AGV en la flota', font: { size: 12 } }, grid: { color: C.tinta + '14' } },
+        y: { min: 0, max: 100, position: 'left', title: { display: true, text: 'Servicio %', font: { size: 12 } }, grid: { color: C.tinta + '14' } },
+        y1: { min: 0, position: 'right', title: { display: true, text: '€/pedido', font: { size: 12 } }, grid: { display: false } },
       },
     },
   });
+  seguirTamano(chart);
   const pintar = () => {
     if (!datos) return;
     const actual = Number(range.value);
@@ -266,7 +266,7 @@ function renderPanel(body: HTMLElement, api: TwinApi) {
         ['Cargando', cnt[3], '#3B7DD8'],
         ['Averiados', cnt[4], '#D63B2F'],
       ]
-        .map(([l, n, c]) => `<span class="pill"><i class="dot" style="background:${c}"></i>${l}: <b>${fmt(n as number)}</b></span>`)
+        .map(([l, n, c]) => `<span class="pill" title="${l}"><i class="dot" style="background:${c}"></i>${l} <b>${fmt(n as number)}</b></span>`)
         .join('');
     }
   });

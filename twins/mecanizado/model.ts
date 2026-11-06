@@ -516,7 +516,7 @@ function explicar(
     return {
       narrativa: plan
         ? `Electricidad ×3 con el plan: equipos en espera apagados y consumos auxiliares a horas valle. Ahora: ${kw.toFixed(0)} kW (${eur.toFixed(1)} €/h).`
-        : `La electricidad cuesta el triple: la producción no cambia, pero sí el coste. Ahora: ${kw.toFixed(0)} kW (${eur.toFixed(1)} €/h). Mira «Energía consumida».`,
+        : `La electricidad cuesta el triple: la producción no cambia, pero sí el coste. Ahora: ${kw.toFixed(0)} kW (${eur.toFixed(1)} €/h). Mira el KPI «Energía».`,
       foco: [],
     };
   }

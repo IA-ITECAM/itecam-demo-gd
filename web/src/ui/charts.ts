@@ -84,4 +84,15 @@ export function setData(chart: Chart, labels: (string | number)[], series: numbe
   chart.update('none');
 }
 
+/** Reajusta la gráfica cada vez que cambia el tamaño de su caja (paneles elásticos sin scroll). */
+export function seguirTamano(chart: Chart) {
+  const caja = chart.canvas.parentElement;
+  if (!caja) return;
+  const ro = new ResizeObserver(() => {
+    if (!caja.isConnected) return ro.disconnect();
+    chart.resize();
+  });
+  ro.observe(caja);
+}
+
 export { Chart };
