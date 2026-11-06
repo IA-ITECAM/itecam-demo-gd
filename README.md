@@ -345,6 +345,9 @@ La misma app se puede publicar como **sitio estático**. En lugar del servidor N
 1. En GitHub: *Settings → Pages → Build and deployment → Source:* **GitHub Actions** (solo la primera vez).
 2. Haz push. La web queda en `https://<usuario-u-organización>.github.io/<repositorio>/`.
 3. Si usas un dominio propio en Pages, crea en *Settings → Secrets and variables → Actions → Variables* la variable `BASE_PATH` con el valor `/`.
+4. Si el despliegue falla con un error de reglas del entorno, ve a *Settings → Environments → github-pages → Deployment branches* y añade tu rama (por ejemplo `master`). Pasa cuando Pages se activa antes del primer push: GitHub solo permite `main` por defecto.
+
+**Publicación actual:** https://ia-itecam.github.io/itecam-demo-gd/ (repositorio [IA-ITECAM/itecam-demo-gd](https://github.com/IA-ITECAM/itecam-demo-gd)).
 
 **Probarla en local antes de subirla** (imita a GitHub Pages: prefijo y `404.html`):
 
