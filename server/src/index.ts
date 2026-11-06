@@ -10,7 +10,6 @@ import { resolve, join } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { MODELS } from '../../twins/registry.gen';
 import { TwinRunner } from '../../core/engine';
-import { reloj } from '../../core/clock';
 import { cargarDatos, type EstadoDatos } from './public-data';
 import {
   leerConfig,
@@ -271,22 +270,7 @@ function programarPesado(id: string, fn: () => void): boolean {
 
 const lastSeriesVersion = new Map<string, number>();
 
-function frame(id: string) {
-  const r = runners.get(id)!;
-  return {
-    type: 'frame',
-    t: r.state.t,
-    reloj: reloj(r.state.t),
-    velocidad: r.speed,
-    pausa: r.paused,
-    escenario: r.escenario,
-    kpis: r.kpis(),
-    ritmo: r.ritmo(),
-    crisis: r.crisisInfo(),
-    datos: datos.fuente,
-    view: r.model.view(r.state),
-  };
-}
+const frame = (id: string) => runners.get(id)!.mensajeFrame(datos.fuente);
 
 interface Conexion {
   vivo: boolean;

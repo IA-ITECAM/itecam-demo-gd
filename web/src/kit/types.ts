@@ -1,9 +1,9 @@
 import type { SceneKit, KitOptions } from './scene-kit';
-import type { TwinSocket } from '../net';
+import type { Conexion } from '../net';
 
 /** API que la página del gemelo ofrece al panel específico de cada gemelo. */
 export interface TwinApi {
-  socket: TwinSocket;
+  socket: Conexion;
   send(cmd: string, args?: Record<string, unknown>): void;
   /** se llama con cada mensaje del servidor */
   on(h: (msg: any) => void): void;

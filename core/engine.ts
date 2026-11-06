@@ -160,6 +160,23 @@ export class TwinRunner<P extends { ctx: ContextoEnergia } = any> {
     return { id: c.id, titulo: def.titulo, plan: c.plan, textoPlan: def.plan, restanteMin: (c.wHasta - this.state.workT) / 60 };
   }
 
+  /** Mensaje «frame» que recibe la interfaz 10 veces por segundo (servidor y versión estática). */
+  mensajeFrame(fuenteDatos: string) {
+    return {
+      type: 'frame' as const,
+      t: this.state.t,
+      reloj: reloj(this.state.t),
+      velocidad: this.speed,
+      pausa: this.paused,
+      escenario: this.escenario,
+      kpis: this.kpis(),
+      ritmo: this.ritmo(),
+      crisis: this.crisisInfo(),
+      datos: fuenteDatos,
+      view: this.model.view(this.state),
+    };
+  }
+
   private aplicarCrisis(s: BaseState<P>, id: CrisisId, plan: boolean) {
     const def = this.config.crisis.find((d) => d.id === id);
     if (!def) throw new Error(`Crisis desconocida: ${id}`);

@@ -1,6 +1,7 @@
 import { TWINS } from './registry';
 import { el, esc } from './ui/format';
 import { url } from './base';
+import { infoDatos, hayAutenticacion } from './net';
 
 /** Ilustraciones sencillas (SVG en línea, sin descargas). */
 const ILUSTRACION: Record<string, string> = {
@@ -56,14 +57,12 @@ export function renderMenu(root: HTMLElement) {
     cards.appendChild(a);
   }
   root.appendChild(page);
-  fetch(url('api/sesion'), { cache: 'no-store' })
-    .then((r) => (r.ok ? r.json() : null))
+  hayAutenticacion()
     .then((s) => {
-      if (s?.autenticacion) page.querySelector('#menu-salir')?.classList.remove('hidden');
+      if (s) page.querySelector('#menu-salir')?.classList.remove('hidden');
     })
     .catch(() => {});
-  fetch(url('api/datos'))
-    .then((r) => r.json())
+  infoDatos()
     .then((d) => {
       const p = page.querySelector('#menu-datos');
       if (p) p.innerHTML = `<i class="dot ${d.fuente === 'públicos' ? 'pub' : 'sim'}"></i> Datos ${d.fuente}`;

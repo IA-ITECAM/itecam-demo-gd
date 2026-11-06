@@ -2,7 +2,9 @@
 
 Aplicación de demostración para el webinar **«Tendencias de la Industria 5.0: gemelos digitales de nueva generación»**, pensada para pymes. Incluye tres gemelos digitales de planta, cada uno con escena 3D, datos en tiempo real (simulados), crisis provocables, curva de resiliencia y comparador de escenarios «¿qué pasa si…?».
 
-- Un solo contenedor y un solo puerto: **http://localhost:8080**
+- Dos formas de publicarla:
+  - **Con servidor** (Docker, VPS, Dokploy o nginx): un solo contenedor y un solo puerto, **http://localhost:8080**. Admite contraseña de acceso.
+  - **Sin servidor** (GitHub Pages): la simulación corre en el navegador. Es pública y gratuita (ver sección 9).
 - Funciona **sin conexión a internet**: toda la geometría 3D se genera por código y no se descarga nada en tiempo de ejecución.
 - Simulación con **semilla fija**: la demo sale siempre igual.
 - Ningún dato procede de empresas reales.
@@ -208,7 +210,10 @@ itecam-demo-gd/
 │  ├─ clock.ts      reloj simulado (Día 1 · 06:00) y turnos
 │  ├─ energy.ts     precios y temperaturas simulados
 │  ├─ types.ts      contrato TwinModel, crisis, escenarios, vista
-│  └─ engine.ts     TwinRunner: velocidad, pausa, crisis, resiliencia (bifurcación), comparador
+│  ├─ engine.ts     TwinRunner: velocidad, pausa, crisis, resiliencia (bifurcación), comparador
+│  ├─ protocolo.ts  lista blanca de comandos (común a servidor y navegador)
+│  ├─ hub.ts        simulación sin servidor (versión estática, en un Web Worker)
+│  └─ datos-publicos.ts  REData y Open-Meteo (desde el servidor o desde el navegador)
 ├─ twins/<id>/                      # UN GEMELO = UNA CARPETA
 │  ├─ config.ts     textos, crisis, escenarios, geometría (compartido servidor/cliente)
 │  ├─ model.ts      simulación (servidor)
@@ -217,6 +222,7 @@ itecam-demo-gd/
 ├─ web/src/                         # Vite + TypeScript + Three.js + Chart.js
 │  ├─ kit/scene-kit.ts  cámara, luces, selección, etiquetas, balizas, halos, instancing, WebXR
 │  ├─ base.ts           prefijo de publicación (BASE_PATH, vía <base href>)
+│  ├─ local/            Web Worker y conexión local de la versión estática
 │  └─ ui/               comparador, curva de resiliencia, gráficas
 └─ tests/                           # Vitest: semilla, KPIs, reproducibilidad, escenarios, datos
 ```
@@ -330,7 +336,44 @@ La primera debe redirigir (`302`) a `/acceso` y la segunda devolver `{"ok":true}
 
 ---
 
-## 9. Seguridad
+## 9. Publicar en GitHub Pages (sin servidor)
+
+La misma app se puede publicar como **sitio estático**. En lugar del servidor Node y el WebSocket, la simulación se ejecuta en un **Web Worker** del navegador de cada visitante, con el mismo motor y la misma semilla. Los resultados son idénticos a los de la versión con servidor (hay un test que lo comprueba).
+
+**Cómo se publica:** el repositorio incluye el workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml). En cada push a `main` o `master` ejecuta los tests, compila la versión estática y la publica.
+
+1. En GitHub: *Settings → Pages → Build and deployment → Source:* **GitHub Actions** (solo la primera vez).
+2. Haz push. La web queda en `https://<usuario-u-organización>.github.io/<repositorio>/`.
+3. Si usas un dominio propio en Pages, crea en *Settings → Secrets and variables → Actions → Variables* la variable `BASE_PATH` con el valor `/`.
+
+**Probarla en local antes de subirla** (imita a GitHub Pages: prefijo y `404.html`):
+
+```bash
+BASE_PATH=/itecam-demo-gd/ npm run build:pages
+```
+
+```bash
+npm run preview:pages
+```
+
+Después, abre http://localhost:4173/itecam-demo-gd/. En Git Bash para Windows, escribe el prefijo sin la barra inicial (`BASE_PATH=itecam-demo-gd`), porque Git Bash convierte `/itecam-demo-gd/` en una ruta de Windows.
+
+**Diferencias con la versión con servidor:**
+
+| | Con servidor (Docker/VPS) | GitHub Pages |
+|---|---|---|
+| Contraseña de acceso | Sí (`CLAVE_ACCESO`) | **No**: el sitio es público para cualquiera con el enlace |
+| Estado de la simulación | Compartido: todos ven la misma planta | Cada visitante tiene la suya; al recargar la página empieza de cero |
+| Dónde se calcula | En el servidor | En el ordenador de quien la abre (los cálculos pesados van en un Web Worker y no congelan el 3D) |
+| Datos públicos (REData, Open-Meteo) | Los consulta el servidor | Los consulta el navegador (ambas APIs lo permiten) |
+| VR en Meta Quest | Requiere HTTPS en tu dominio | Funciona directamente (Pages ya usa HTTPS) |
+| Coste y mantenimiento | VPS, proxy y certificados | Gratis y sin servidor que mantener |
+
+Seguridad en Pages: no hay servidor que atacar. La página lleva una política CSP en una etiqueta `<meta>`: solo carga scripts propios y solo se conecta a REData y a Open-Meteo. Ten en cuenta que **todo el contenido es público**, así que no publiques datos reales.
+
+---
+
+## 10. Seguridad (versión con servidor)
 
 Se revisó la aplicación pensando en su publicación en Internet. Medidas aplicadas:
 
@@ -360,9 +403,9 @@ Riesgos que quedan (asumidos para una demo):
 
 ---
 
-## 10. VR (Meta Quest 3, opcional)
+## 11. VR (Meta Quest 3, opcional)
 
-El botón **VR** aparece solo si el navegador admite WebXR. Las gafas exigen un **contexto seguro** (HTTPS o `localhost`). Desplegada en Dokploy con dominio HTTPS, basta con abrir el dominio en el navegador de las Quest. En local, `http://IP-del-portátil:8080` no basta. Opciones:
+El botón **VR** aparece solo si el navegador admite WebXR. Las gafas exigen un **contexto seguro** (HTTPS o `localhost`). Desplegada en Dokploy con dominio HTTPS, o en GitHub Pages, basta con abrir la URL en el navegador de las Quest. En local, `http://IP-del-portátil:8080` no basta. Opciones:
 
 - Conectar las gafas por USB y usar `adb reverse tcp:8080 tcp:8080`; después, abrir `http://localhost:8080` en el navegador de las Quest.
 - Publicar el puerto con un túnel HTTPS.
@@ -371,11 +414,11 @@ En VR apareces en el borde de la planta. Las etiquetas flotantes no se muestran 
 
 ---
 
-## 11. Limitaciones conocidas
+## 12. Limitaciones conocidas
 
 - Son **modelos de demostración**: los parámetros son genéricos y verosímiles, pero no proceden de ninguna empresa. No deben usarse para decisiones reales sin calibrarlos.
 - Los AGV no gestionan colisiones ni bloqueos entre sí (pueden cruzarse en un pasillo).
 - La curva de resiliencia se calcula sobre un horizonte fijo (6 h, o 10 h en alimentación) y se suaviza para dibujarla; los totales usan los datos sin suavizar.
 - Durante el cálculo del comparador (unas décimas de segundo) o de la gráfica de flota del almacén (≈ 0,7 s la primera vez) la simulación en vivo se detiene un instante.
-- Todos los espectadores conectados a un mismo gemelo ven y controlan la misma instancia.
+- Versión con servidor: todos los espectadores conectados a un mismo gemelo ven y controlan la misma instancia. En GitHub Pages cada visitante tiene la suya y no hay contraseña.
 - VR: probado solo el arranque del botón; la experiencia en las Quest depende del contexto seguro descrito arriba.

@@ -1,5 +1,40 @@
-/** Cliente WebSocket con reconexión automática. */
+/**
+ * Conexión de la interfaz con la simulación:
+ *  - versión servidor: WebSocket con reconexión automática (TwinSocket);
+ *  - versión estática (GitHub Pages): Web Worker en el propio navegador (ConexionLocal).
+ */
 import { url, rutaActual } from './base';
+import { ConexionLocal, pedirDatosLocal } from './local/cliente';
+
+/** true en el build estático (npm run build:pages). */
+export const MODO_ESTATICO = import.meta.env.VITE_MODO === 'estatico';
+
+export type Handler = (msg: any) => void;
+
+export interface Conexion {
+  on(h: Handler): () => void;
+  send(cmd: string, args?: Record<string, unknown>): void;
+  close(): void;
+  onStatus: (ok: boolean) => void;
+}
+
+export function crearConexion(gemelo: string): Conexion {
+  return MODO_ESTATICO ? new ConexionLocal(gemelo) : new TwinSocket(gemelo);
+}
+
+/** Estado de los datos (simulados / públicos) para el menú. */
+export async function infoDatos(): Promise<any> {
+  if (MODO_ESTATICO) return pedirDatosLocal();
+  const r = await fetch(url('api/datos'));
+  return r.json();
+}
+
+/** ¿Hay contraseña de acceso? (solo en la versión con servidor) */
+export async function hayAutenticacion(): Promise<boolean> {
+  if (MODO_ESTATICO) return false;
+  const r = await fetch(url('api/sesion'), { cache: 'no-store' });
+  return r.ok ? !!(await r.json())?.autenticacion : false;
+}
 
 export function irAlAcceso() {
   location.href = `${url('acceso')}?volver=${encodeURIComponent(rutaActual())}`;
@@ -14,9 +49,7 @@ export async function comprobarSesion() {
     /* sin red: se seguirá reintentando */
   }
 }
-export type Handler = (msg: any) => void;
-
-export class TwinSocket {
+export class TwinSocket implements Conexion {
   private ws: WebSocket | null = null;
   private handlers = new Set<Handler>();
   private closed = false;

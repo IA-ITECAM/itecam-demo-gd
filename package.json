@@ -13,7 +13,9 @@
     "dev:server": "npm run gen && tsx watch server/src/index.ts",
     "dev:web": "vite",
     "test": "npm run gen && vitest run",
-    "typecheck": "npm run gen && tsc -p tsconfig.json --noEmit"
+    "typecheck": "npm run gen && tsc -p tsconfig.json --noEmit",
+    "build:pages": "vite build --mode pages",
+    "preview:pages": "node scripts/servir-pages.mjs"
   },
   "engines": {
     "node": ">=20"

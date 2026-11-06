@@ -4,7 +4,7 @@
  */
 import type { TwinConfig, Equipo, ScenarioId } from '../../core/types';
 import type { Kpis } from '../../core/kpis';
-import { TwinSocket } from './net';
+import { crearConexion } from './net';
 import { BASE } from './base';
 import { loadScene } from './registry';
 import { SceneKit, COLOR_ESTADO, TEXTO_ESTADO } from './kit/scene-kit';
@@ -56,7 +56,7 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
   root.appendChild(page);
 
   const $ = <T extends HTMLElement = HTMLElement>(s: string) => page.querySelector(s) as T;
-  const socket = new TwinSocket(cfg.id);
+  const socket = crearConexion(cfg.id);
   const resModal = new ResilienceModal(page);
   const cmpModal = new ComparatorModal(page, cfg);
   let lastFrame: any = null;
@@ -412,7 +412,7 @@ export function renderTwin(root: HTMLElement, cfg: TwinConfig): () => void {
 
   // ---------- Atajos de teclado ----------
   const onKey = (e: KeyboardEvent) => {
-    if ((e.target as HTMLElement).closest('input, textarea')) return;
+    if ((e.target as Element | null)?.closest?.('input, textarea')) return;
     if (e.key === ' ') {
       e.preventDefault();
       socket.send('pausa');
