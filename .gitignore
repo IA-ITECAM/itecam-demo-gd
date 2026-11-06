@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# Generado en cada build por scripts/gen-registry.mjs
+twins/registry.gen.ts
+# Configuración local de herramientas
+.claude/

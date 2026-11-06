@@ -1,0 +1,38 @@
+{
+  "name": "itecam-demo-gd",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Demo de gemelos digitales industriales (Industria 5.0) para pymes",
+  "type": "module",
+  "scripts": {
+    "gen": "node scripts/gen-registry.mjs",
+    "build:web": "vite build",
+    "build:server": "node scripts/build-server.mjs",
+    "build": "npm run gen && npm run build:web && npm run build:server",
+    "start": "node dist/server.cjs",
+    "dev:server": "npm run gen && tsx watch server/src/index.ts",
+    "dev:web": "vite",
+    "test": "npm run gen && vitest run",
+    "typecheck": "npm run gen && tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "@types/ws": "^8.18.2",
+    "chart.js": "^4.6.1",
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}

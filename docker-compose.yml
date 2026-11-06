@@ -1,0 +1,14 @@
+services:
+  gemelos:
+    build: .
+    image: itecam-demo-gd:latest
+    container_name: itecam-demo-gd
+    ports:
+      - "8080:8080"
+    environment:
+      # Datos públicos (REData + Open-Meteo). Desactivado por defecto: "0".
+      # Con "1" intenta descargarlos al arrancar; si falla, sigue con datos simulados.
+      - DATOS_PUBLICOS=0
+      # Semilla de la simulación (misma semilla = misma demo)
+      - SEMILLA=2026
+    restart: unless-stopped
